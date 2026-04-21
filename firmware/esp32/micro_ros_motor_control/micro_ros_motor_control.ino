@@ -41,7 +41,12 @@
 #define WHEEL_BASE_Y   0.110f    // m, 前后轴距 / 2
 #define PPR            13
 #define GEAR_RATIO     20
-#define ENC_CPR        (PPR * GEAR_RATIO * 4)   // = 1040
+// ENC_MULT: 编码器倍频
+//   1 = 只在 A 的 RISING 触发中断 (代码当前做法, CPR=260) ← 默认, 省 CPU
+//   2 = A 的 CHANGE (双边沿, CPR=520)
+//   4 = A+B 都 CHANGE (正交解码, CPR=1040) ← 精度最高但中断频率高
+#define ENC_MULT       1
+#define ENC_CPR        (PPR * GEAR_RATIO * ENC_MULT)
 #define M_TO_ENC       (ENC_CPR / (2 * PI * WHEEL_RADIUS))
 
 // ==================== GPIO 分配 ====================
@@ -128,13 +133,23 @@ void mecanum_fk(float *w, float &vx, float &vy, float &wz) {
   wz = R / (4.0f * L) * (-w[0] + w[1] - w[2] + w[3]);
 }
 
-// ==================== 电机驱动 ====================
+// ==================== 电机驱动 (LEDC, ESP32 Arduino Core 3.x) ====================
+// 用 LEDC 硬件 PWM 而不是 analogWrite, 可配频率/分辨率, 消除 5kHz 嘶叫
+#define PWM_FREQ   20000   // 20kHz, 超出人耳范围
+#define PWM_RES    8       // 8-bit -> 0-255
+#define LEDC_CH(i) (i)     // 四个电机各占一个 LEDC channel 0-3
+
+void pwm_setup() {
+  for (int i = 0; i < 4; i++) {
+    ledcAttach(PWM_PIN[i], PWM_FREQ, PWM_RES);  // Arduino Core 3.x API
+  }
+}
+
 void set_motor_pwm(int i, float pwm_val) {
-  // pwm_val -255..255
   bool forward = pwm_val >= 0;
   digitalWrite(DIR_PIN[i], forward ? HIGH : LOW);
   int duty = constrain((int)fabs(pwm_val), 0, 255);
-  analogWrite(PWM_PIN[i], duty);
+  ledcWrite(PWM_PIN[i], duty);
 }
 
 // ==================== 回调 ====================
@@ -213,13 +228,17 @@ void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
 
-  // GPIO
+  // GPIO + LEDC PWM
   for (int i = 0; i < 4; i++) {
-    pinMode(PWM_PIN[i], OUTPUT);
     pinMode(DIR_PIN[i], OUTPUT);
     pinMode(ENC_A[i], INPUT_PULLUP);
     pinMode(ENC_B[i], INPUT_PULLUP);
   }
+  pwm_setup();
+
+  // ADC (电池电压)
+  analogReadResolution(12);           // 0-4095
+  analogSetAttenuation(ADC_11db);     // 0-3.3V 量程
   attachInterrupt(digitalPinToInterrupt(ENC_A[0]), enc_isr_0, RISING);
   attachInterrupt(digitalPinToInterrupt(ENC_A[1]), enc_isr_1, RISING);
   attachInterrupt(digitalPinToInterrupt(ENC_A[2]), enc_isr_2, RISING);
