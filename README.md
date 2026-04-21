@@ -4,7 +4,7 @@
 
 3 分钟内 (新版 8 分钟) 在 3m×2m 赛场扫 START → 扫货架 QR → 升叉 → 搬到目的区 → 放下 → 循环 4 次.
 
-**Deadline**: 2026-04-27 (Mon) · [Game field spec](docs/game_field.md) · [Presentation](docs/presentation_content.md)
+**Deadline**: 2026-04-27 (Mon) · [Game field spec](docs/game_field.md) · [Wiring](docs/wiring.md) · [PID tuning](docs/pid_tuning.md)
 
 ---
 
@@ -57,9 +57,7 @@ docs/
 ├── game_field.md                    # 赛场尺寸 + QR 布置
 ├── wiring.md                        # 电路 / GPIO / 布线
 ├── pid_tuning.md                    # PID 调参流程
-├── deployment_notes.md              # 7 天时间线 + SOP
-├── presentation_content.md          # 8 min 演讲完整内容 ⭐
-├── presentation_outline.md          # 演讲大纲 (旧版, 已被 content 替代)
+├── deployment_notes.md              # 时间线 + SOP + 测试验收标准
 └── *.pdf                            # 官方项目文档归档
 
 firmware/esp32/
@@ -72,12 +70,13 @@ ros_pkg/our_robot/                   # Pi5 主 ROS 包
 ├── urdf/
 │   └── robot.urdf.xacro             # TF 树
 ├── our_robot/
-│   ├── mission_fsm_node.py          # ⭐ 主 FSM + QR 时间戳 CSV (新版要求)
+│   ├── mission_fsm_node.py          # 主 FSM + QR 时间戳 CSV
 │   ├── qr_scanner_node.py           # pyzbar + CLAHE
 │   ├── manual_mission_node.py       # B range 手动模式 FSM
-│   └── battery_monitor_node.py      # 低电量告警
+│   ├── battery_monitor_node.py      # 低电量告警
+│   └── odom_tf_broadcaster.py       # odom -> base_footprint TF
 ├── launch/
-│   ├── robot_full.launch.py         # ⭐ 比赛一键启动
+│   ├── robot_full.launch.py         # 比赛一键启动
 │   ├── robot_manual.launch.py       # B range 手动启动
 │   ├── slam_mapping.launch.py       # 赛前 SLAM 建图
 │   ├── teleop_mode.launch.py        # 简化手动模式
@@ -135,7 +134,6 @@ scripts/
 | **C — 视觉** | 相机标定 / QR | `ros_pkg/.../qr_scanner_node.py` |
 | **D — LiDAR/导航** | SLAM / Nav2 参数 / 地图 | `config/nav2_params.yaml`, `slam_toolbox_params.yaml` |
 | **集成/FSM** | 状态机 / 联调 | `mission_fsm_node.py` |
-| **PPT + 商业** | 演讲 / 市场分析 / 财务 | `docs/presentation_content.md` |
 
 ---
 
@@ -166,4 +164,4 @@ git add -A && git commit -m "Update team code to XXXX" && git push
 ## Deadline
 
 - **2026-04-27 Monday 17:00**: 实物机器人 → HW 103A (Mr. Derek Tong / Mr. Mark Wan)
-- **2026-04-27 Monday 23:59**: CAD + 代码 + PPT → Moodle
+- **2026-04-27 Monday 23:59**: CAD + 代码 → Moodle
