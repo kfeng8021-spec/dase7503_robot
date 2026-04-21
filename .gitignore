@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+install/
+log/
+.vscode/
+.idea/
+*.pgm
+*.zip.bak
+ros_pkg/our_robot/maps/gamefield_map.*
+!ros_pkg/our_robot/maps/.gitkeep
+scripts/qr_scan_log_*.csv
