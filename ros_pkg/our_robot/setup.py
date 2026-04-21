@@ -12,18 +12,22 @@ setup(
         (f"share/{package_name}", ["package.xml"]),
         (f"share/{package_name}/launch", glob("launch/*.launch.py")),
         (f"share/{package_name}/config", glob("config/*.yaml")),
+        (f"share/{package_name}/config", glob("config/*.rviz")),
+        (f"share/{package_name}/urdf", glob("urdf/*.xacro")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="DASE7503 Team",
     maintainer_email="kfeng8021@gmail.com",
-    description="DASE7503 robot mission FSM + QR scanner",
+    description="DASE7503 robot mission FSM + QR scanner + manual fallback + battery monitor",
     license="MIT",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
             "qr_scanner_node = our_robot.qr_scanner_node:main",
             "mission_fsm_node = our_robot.mission_fsm_node:main",
+            "manual_mission_node = our_robot.manual_mission_node:main",
+            "battery_monitor_node = our_robot.battery_monitor_node:main",
         ],
     },
 )

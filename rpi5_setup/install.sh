@@ -112,9 +112,25 @@ sudo -u "$REAL_USER" bash -c "
     echo 'source $WS/install/setup.bash' >> $REAL_HOME/.bashrc
 "
 
+# ---------- 10. systemd + udev (可选, 比赛前开启开机自启) ----------
+log "安装 systemd 服务 + udev 规则 (不启用, 调试完后 systemctl enable)"
+if [ -f "$(dirname "$0")/install_systemd.sh" ]; then
+  bash "$(dirname "$0")/install_systemd.sh" || true
+fi
+
+# ---------- 11. Python 工具包 ----------
+log "pip 装 qrcode / pyzbar Python 包 (给脚本用)"
+sudo -u "$REAL_USER" pip3 install --break-system-packages --user qrcode pillow || true
+
 log "完成!  重启让 camera overlay 生效: sudo reboot"
-log "重启后验证:"
-log "  ros2 topic list"
-log "  ros2 run camera_ros camera_node  # 应该看到 /camera/image_raw"
-log "  ros2 launch ydlidar_ros2_driver ydlidar_launch.py  # 应该看到 /scan"
-log "  ros2 launch our_robot robot_full.launch.py  # 一键全跑"
+log ""
+log "重启后验证步骤:"
+log "  1) ros2 topic list                    # 应看到基础话题"
+log "  2) ros2 run camera_ros camera_node    # 应看到 /camera/image_raw"
+log "  3) ros2 launch ydlidar_ros2_driver ydlidar_launch.py  # 应看到 /scan"
+log "  4) 烧 ESP32 固件 (firmware/esp32/) 后: ros2 topic echo /wheel_odom"
+log "  5) scripts/test_motor_straight.py     # 验证电机方向 + PID"
+log "  6) 赛前 SLAM 建图: ros2 launch our_robot slam_mapping.launch.py"
+log "  7) 比赛启动: ros2 launch our_robot robot_full.launch.py"
+log ""
+log "B range 手动模式: ros2 launch our_robot robot_manual.launch.py"

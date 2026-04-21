@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<robot name="dase7503_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    Mecanum 4 轮全向底盘 + 升降叉 URDF.
+    尺寸按实际设计目标: 280×280×170mm (留 10mm 安全边).
+    TF 树: map -> odom -> base_footprint -> base_link -> {laser_link, camera_link, wheel_*_link, lifter_link}
+  -->
+
+  <xacro:property name="base_w" value="0.280"/>
+  <xacro:property name="base_l" value="0.280"/>
+  <xacro:property name="base_h" value="0.060"/>
+  <xacro:property name="wheel_r" value="0.0325"/>
+  <xacro:property name="wheel_w" value="0.040"/>
+  <xacro:property name="wheel_base_x" value="0.110"/>
+  <xacro:property name="wheel_base_y" value="0.110"/>
+  <xacro:property name="laser_h" value="0.130"/>
+  <xacro:property name="camera_h" value="0.120"/>
+
+  <material name="aluminum"><color rgba="0.7 0.7 0.75 1"/></material>
+  <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
+  <material name="red"><color rgba="0.8 0.1 0.1 1"/></material>
+
+  <!-- base -->
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_to_base" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_r}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <geometry><box size="${base_l} ${base_w} ${base_h}"/></geometry>
+      <material name="aluminum"/>
+    </visual>
+    <collision>
+      <geometry><box size="${base_l} ${base_w} ${base_h}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="1.5"/>
+      <inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.03"/>
+    </inertial>
+  </link>
+
+  <!-- 4 wheels -->
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <geometry><cylinder length="${wheel_w}" radius="${wheel_r}"/></geometry>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <geometry><cylinder length="${wheel_w}" radius="${wheel_r}"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.1"/>
+        <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}_link"/>
+      <origin xyz="${x} ${y} ${-base_h/2}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+  <xacro:wheel name="wheel_fl" x="${wheel_base_x}"  y="${wheel_base_y}"/>
+  <xacro:wheel name="wheel_fr" x="${wheel_base_x}"  y="${-wheel_base_y}"/>
+  <xacro:wheel name="wheel_rl" x="${-wheel_base_x}" y="${wheel_base_y}"/>
+  <xacro:wheel name="wheel_rr" x="${-wheel_base_x}" y="${-wheel_base_y}"/>
+
+  <!-- MS200 LiDAR -->
+  <link name="laser_link">
+    <visual>
+      <geometry><cylinder length="0.04" radius="0.04"/></geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_link"/>
+    <origin xyz="0 0 ${laser_h}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Pi Camera 3 (IMX708) -->
+  <link name="camera_link">
+    <visual>
+      <geometry><box size="0.025 0.025 0.025"/></geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <!-- 机器人前方, 微下倾 15° -->
+    <origin xyz="${base_l/2} 0 ${camera_h}" rpy="0 0.2618 0"/>
+  </joint>
+
+  <!-- Lifter fork (升降叉) -->
+  <link name="lifter_link">
+    <visual>
+      <geometry><box size="0.08 0.14 0.01"/></geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+  <joint name="lifter_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="lifter_link"/>
+    <origin xyz="${base_l/2 + 0.04} 0 -${base_h/2 - 0.01}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="50" velocity="0.1" lower="0" upper="0.03"/>
+  </joint>
+</robot>

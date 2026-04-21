@@ -32,6 +32,7 @@
 #include <geometry_msgs/msg/twist.h>
 #include <nav_msgs/msg/odometry.h>
 #include <std_msgs/msg/int32.h>
+#include <std_msgs/msg/float32.h>
 #include <ESP32Servo.h>
 
 // ==================== 物理常量 ====================
@@ -49,6 +50,9 @@ const int DIR_PIN[4] = {5,  16, 10, 14};
 const int ENC_A[4]   = {6,  47, 11, 1};
 const int ENC_B[4]   = {7,  48, 12, 2};
 #define SERVO_PIN 8
+// 电池电压采样: 7.4V 锂电池经 10k / 3.3k 分压到 ESP32 ADC 量程内
+#define BATTERY_ADC_PIN 3      // GPIO3, ADC1_CH2 (避开 Motor4 ENC_A=GPIO1 冲突)
+#define BATTERY_DIVIDER 4.03f  // (10k+3.3k)/3.3k 实测值, 需用万用表标定
 
 // ==================== 状态 ====================
 volatile long enc_count[4] = {0, 0, 0, 0};
@@ -82,15 +86,16 @@ PID pid[4];
 
 // ==================== micro-ROS 对象 ====================
 rcl_subscription_t sub_cmd_vel, sub_lifter;
-rcl_publisher_t pub_odom;
+rcl_publisher_t pub_odom, pub_battery;
 geometry_msgs__msg__Twist msg_cmd_vel;
 std_msgs__msg__Int32 msg_lifter;
 nav_msgs__msg__Odometry msg_odom;
+std_msgs__msg__Float32 msg_battery;
 rclc_executor_t executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
-rcl_timer_t odom_timer;
+rcl_timer_t odom_timer, battery_timer;
 
 #define RCCHECK(fn) { rcl_ret_t rc = fn; if (rc != RCL_RET_OK) { error_loop(); } }
 #define RCSOFTCHECK(fn) { rcl_ret_t rc = fn; (void)rc; }
@@ -148,6 +153,15 @@ void lifter_cb(const void *msgin) {
   const std_msgs__msg__Int32 *m = (const std_msgs__msg__Int32 *) msgin;
   lifter_state = m->data;
   lifter.write(lifter_state == 1 ? 180 : 0);  // 180°=抬起, 0°=放下
+}
+
+void battery_timer_cb(rcl_timer_t *, int64_t) {
+  // 每秒发一次电池电压
+  int raw = analogRead(BATTERY_ADC_PIN);   // 0-4095 对应 0-3.3V
+  float v_adc = raw * (3.3f / 4095.0f);
+  float v_batt = v_adc * BATTERY_DIVIDER;
+  msg_battery.data = v_batt;
+  RCSOFTCHECK(rcl_publish(&pub_battery, &msg_battery, NULL));
 }
 
 void odom_timer_cb(rcl_timer_t *, int64_t) {
@@ -233,6 +247,10 @@ void setup() {
       &pub_odom, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry), "/wheel_odom"));
 
+  RCCHECK(rclc_publisher_init_default(
+      &pub_battery, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32), "/battery_voltage"));
+
   // header frame_id
   msg_odom.header.frame_id.data = (char *)"odom";
   msg_odom.header.frame_id.size = 4;
@@ -242,11 +260,13 @@ void setup() {
   msg_odom.child_frame_id.capacity = 10;
 
   RCCHECK(rclc_timer_init_default(&odom_timer, &support, RCL_MS_TO_NS(50), odom_timer_cb));
+  RCCHECK(rclc_timer_init_default(&battery_timer, &support, RCL_MS_TO_NS(1000), battery_timer_cb));
 
-  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &sub_cmd_vel, &msg_cmd_vel, &cmd_vel_cb, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sub_lifter, &msg_lifter, &lifter_cb, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
+  RCCHECK(rclc_executor_add_timer(&executor, &battery_timer));
 
   last_loop_ms = millis();
 }

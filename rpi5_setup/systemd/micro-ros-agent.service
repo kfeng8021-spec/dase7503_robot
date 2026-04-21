@@ -1,0 +1,19 @@
+[Unit]
+Description=micro-ROS Agent for ESP32 (Yahboom MicroROS-Board)
+After=network.target dev-ttyUSB0.device
+Wants=dev-ttyUSB0.device
+# 如果用 udev 绑定了 /dev/esp32, 改成 dev-esp32.device
+
+[Service]
+Type=simple
+User=dase
+Environment="HOME=/home/dase"
+Environment="ROS_DOMAIN_ID=0"
+Environment="RMW_IMPLEMENTATION=rmw_cyclonedds_cpp"
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && \
+  ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200'
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+# 给 USB 设备绑定固定符号链接, 解决 /dev/ttyUSB* 顺序不固定的问题.
+# 使用前先运行:
+#   udevadm info -a -n /dev/ttyUSB0 | grep -E "idVendor|idProduct|serial"
+#   udevadm info -a -n /dev/ttyUSB1 | grep -E "idVendor|idProduct|serial"
+# 找到 ESP32 和 LiDAR 的 VID/PID 改下面的值 (默认用 CH340=1a86:7523 和 CP210x=10c4:ea60).
+#
+# 装法:
+#   sudo cp 99-robot-devices.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#   重新插 USB 后 ls -l /dev/esp32 /dev/lidar 应该看到链接
+#
+# 代码里用 /dev/esp32 和 /dev/lidar 不用再关心 ttyUSB 编号.
+
+# Yahboom ESP32-S3 MicroROS-Board (CH340 USB-Serial)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="esp32", MODE="0666", GROUP="dialout"
+
+# MS200 LiDAR (CP210x, 按实际 VID/PID 修改)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="lidar", MODE="0666", GROUP="dialout"
+
+# 如果 ESP32 用 CP2102 而不是 CH340, 取消注释这行并注释上面的 ESP32 那行
+# SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="<填序列号>", SYMLINK+="esp32", MODE="0666", GROUP="dialout"
