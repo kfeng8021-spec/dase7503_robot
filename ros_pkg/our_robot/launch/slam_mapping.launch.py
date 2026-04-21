@@ -42,15 +42,23 @@ def generate_launch_description():
         ])
     )
 
-    # 3. URDF robot_state_publisher (给 TF 树提供 base_link -> laser_link)
-    urdf_file = os.path.join(
-        os.path.expanduser("~/ros2_ws/src/our_robot/urdf/robot.urdf.xacro")
-    )
+    # 3. URDF robot_state_publisher (给 TF 树提供 base_link -> laser_link 等静态 TF)
+    from launch.substitutions import Command
+    pkg_share = FindPackageShare("our_robot")
+    urdf_path = PathJoinSubstitution([pkg_share, "urdf", "robot.urdf.xacro"])
     robot_state = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[{"robot_description": f"$(xacro {urdf_file})"}],
-        output="screen",
+        parameters=[{"robot_description": Command(["xacro ", urdf_path])}],
+        output="log",
+    )
+
+    # 3b. odom -> base_footprint TF (SLAM 也需要)
+    odom_tf = Node(
+        package="our_robot",
+        executable="odom_tf_broadcaster",
+        name="odom_tf_broadcaster",
+        output="log",
     )
 
     # 4. SLAM Toolbox (online async 模式, 边走边建)
@@ -67,7 +75,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         agent,
-        lidar,
         robot_state,
+        odom_tf,
+        lidar,
         slam,
     ])

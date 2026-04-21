@@ -78,6 +78,14 @@ def generate_launch_description():
         output="screen",
     )
 
+    # 6b. Odom TF Broadcaster (补齐 odom -> base_footprint TF, Nav2 必需)
+    odom_tf = Node(
+        package="our_robot",
+        executable="odom_tf_broadcaster",
+        name="odom_tf_broadcaster",
+        output="log",
+    )
+
     # 7. Nav2 Localization (AMCL, 加载赛前建好的地图)
     nav2_localization = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -121,6 +129,7 @@ def generate_launch_description():
         DeclareLaunchArgument("esp_dev", default_value="/dev/ttyUSB0"),
         agent,
         robot_state,
+        odom_tf,
         lidar,
         camera,
         qr_scanner,

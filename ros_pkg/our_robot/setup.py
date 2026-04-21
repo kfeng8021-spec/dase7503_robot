@@ -28,6 +28,7 @@ setup(
             "mission_fsm_node = our_robot.mission_fsm_node:main",
             "manual_mission_node = our_robot.manual_mission_node:main",
             "battery_monitor_node = our_robot.battery_monitor_node:main",
+            "odom_tf_broadcaster = our_robot.odom_tf_broadcaster:main",
         ],
     },
 )
