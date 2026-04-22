@@ -13,12 +13,13 @@ if tmux has-session -t $SESSION 2>/dev/null; then
 fi
 
 MAP="${MAP:-$HOME/maps/gamefield_map.yaml}"
+ESP_DEV="${ESP_DEV:-/dev/esp32}"   # udev 未装时 override: ESP_DEV=/dev/ttyUSB0 bash start_robot_tmux.sh
 
 tmux new-session -d -s $SESSION -x 220 -y 50
 
 # Pane 0: agent
-tmux send-keys -t $SESSION 'echo "=== micro-ROS Agent ===" && source /opt/ros/jazzy/setup.bash && \
-  ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200' C-m
+tmux send-keys -t $SESSION "echo '=== micro-ROS Agent ===' && source /opt/ros/jazzy/setup.bash && \
+  ros2 run micro_ros_agent micro_ros_agent serial --dev $ESP_DEV -b 115200" C-m
 
 # Pane 1: lidar
 tmux split-window -h -t $SESSION

@@ -23,11 +23,13 @@ def generate_launch_description():
     pkg_share = FindPackageShare("our_robot")
     slam_params = PathJoinSubstitution([pkg_share, "config", "slam_toolbox_params.yaml"])
 
+    esp_dev = LaunchConfiguration("esp_dev", default="/dev/esp32")
+
     # 1. micro-ROS Agent (底盘必须上线, SLAM 需要 odom)
     agent = ExecuteProcess(
         cmd=[
             "ros2", "run", "micro_ros_agent", "micro_ros_agent",
-            "serial", "--dev", "/dev/ttyUSB0", "-b", "115200",
+            "serial", "--dev", esp_dev, "-b", "115200",
         ],
         output="screen",
     )
@@ -74,6 +76,7 @@ def generate_launch_description():
     # 这里不拉起 (终端抢焦点)
 
     return LaunchDescription([
+        DeclareLaunchArgument("esp_dev", default_value="/dev/esp32"),
         agent,
         robot_state,
         odom_tf,

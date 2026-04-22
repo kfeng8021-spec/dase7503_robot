@@ -22,7 +22,9 @@ def generate_launch_description():
         "map", default=os.path.expanduser("~/maps/gamefield_map.yaml")
     )
     use_sim_time = LaunchConfiguration("use_sim_time", default="false")
-    esp_dev = LaunchConfiguration("esp_dev", default="/dev/ttyUSB0")
+    # 默认用 udev 绑定的符号链接 /dev/esp32 (见 rpi5_setup/udev/99-robot-devices.rules).
+    # 如 udev 未装, 启动时显式传参: ros2 launch ... esp_dev:=/dev/ttyUSB0
+    esp_dev = LaunchConfiguration("esp_dev", default="/dev/esp32")
 
     # 1. micro-ROS Agent (ESP32, 波特率 115200 必须跟固件 Serial.begin 一致)
     agent = ExecuteProcess(
@@ -129,7 +131,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("map", default_value=map_file),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
-        DeclareLaunchArgument("esp_dev", default_value="/dev/ttyUSB0"),
+        DeclareLaunchArgument("esp_dev", default_value="/dev/esp32"),
         agent,
         robot_state,
         odom_tf,

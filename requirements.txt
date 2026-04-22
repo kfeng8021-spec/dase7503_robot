@@ -1,0 +1,21 @@
+# DASE7503 机器人 · 非 apt 的 Python 依赖清单
+#
+# 说明:
+#   apt 装的包 (python3-opencv / python3-pyzbar / numpy) 已在 rpi5_setup/install.sh
+#   处理. 本文件只列**需要 pip 装**的增补包.
+#
+#   install.sh 会自动执行等价的 pip3 install, 手动装法:
+#     pip3 install --break-system-packages --user -r requirements.txt
+#
+# ---------------------------------------------------------------------------
+# QR 码生成 (scripts/qr_generate.py 用)
+qrcode>=7.4
+pillow>=10.0
+
+# YOLO 加分项 (可选, Tutorial 7 第 4 节教学内容).
+# 比赛 robot_full.launch.py 默认不启动 yolo_detector_node.
+# 要跑 YOLO: ros2 run our_robot yolo_detector_node
+onnxruntime>=1.17
+
+# numpy 锁版本: onnxruntime + opencv-python 2.x 还没跟上 numpy 2.0, 装 1.26.4 稳
+numpy==1.26.4

@@ -13,14 +13,17 @@ B range (手动控制) launch — 自动导航失败时的保底方案.
   3. 用键盘控制机器人 + 扫 QR + 按键抬升降机构
 """
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    esp_dev = LaunchConfiguration("esp_dev", default="/dev/esp32")
+
     agent = ExecuteProcess(
         cmd=["ros2", "run", "micro_ros_agent", "micro_ros_agent",
-             "serial", "--dev", "/dev/ttyUSB0", "-b", "115200"],
+             "serial", "--dev", esp_dev, "-b", "115200"],
         output="screen",
     )
     camera = Node(package="camera_ros", executable="camera_node", output="screen")
@@ -31,4 +34,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    return LaunchDescription([agent, camera, qr, manual_fsm])
+    return LaunchDescription([
+        DeclareLaunchArgument("esp_dev", default_value="/dev/esp32"),
+        agent, camera, qr, manual_fsm,
+    ])

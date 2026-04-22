@@ -15,18 +15,19 @@ B range 完整手动模式 (Game Demonstration 评分 B range).
   (已在 launch 中拉起, 如终端不方便输入再单独拉)
 """
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess
-from launch.substitutions import Command, PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
     pkg_share = FindPackageShare("our_robot")
+    esp_dev = LaunchConfiguration("esp_dev", default="/dev/esp32")
 
     agent = ExecuteProcess(
         cmd=["ros2", "run", "micro_ros_agent", "micro_ros_agent",
-             "serial", "--dev", "/dev/ttyUSB0", "-b", "115200"],
+             "serial", "--dev", esp_dev, "-b", "115200"],
         output="screen",
     )
     urdf_path = PathJoinSubstitution([pkg_share, "urdf", "robot.urdf.xacro"])
@@ -45,4 +46,7 @@ def generate_launch_description():
         prefix="xterm -e",   # 独立窗口, 键盘输入不冲突
     )
 
-    return LaunchDescription([agent, robot_state, camera, qr, battery, manual_fsm])
+    return LaunchDescription([
+        DeclareLaunchArgument("esp_dev", default_value="/dev/esp32"),
+        agent, robot_state, camera, qr, battery, manual_fsm,
+    ])

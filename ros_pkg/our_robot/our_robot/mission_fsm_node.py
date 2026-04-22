@@ -48,6 +48,10 @@ class State(Enum):
 
 
 class MissionFSM(Node):
+    LIFT_DWELL_SEC = 1.5       # 升降机构伺服到位时间
+    SCAN_TIMEOUT_SEC = 10.0    # 扫不到 QR 的超时
+    MAX_SCAN_RETRIES = 2       # 单个货架最多重扫次数
+
     def __init__(self):
         super().__init__("mission_fsm")
 
@@ -56,12 +60,23 @@ class MissionFSM(Node):
         self.qr_sub = self.create_subscription(String, "/qr_result", self._qr_cb, 10)
         self.lift_pub = self.create_publisher(Int32, "/lifter_cmd", 10)
 
+        # Nav2 ActionServer 预热 (一次性阻塞, 放 init 避免阻塞 timer callback)
+        self.get_logger().info("Waiting for navigate_to_pose action server...")
+        if not self._nav.wait_for_server(timeout_sec=30.0):
+            self.get_logger().error("navigate_to_pose server not available after 30s")
+        else:
+            self.get_logger().info("Nav2 action server ready.")
+
         # FSM state
         self.state = State.IDLE
+        self.state_t0 = time.time()       # 进入当前状态的时间 (用于非阻塞计时)
         self.rack_queue = list(DELIVERY_ORDER)
         self.current_rack = None
         self.qr_recv = None
         self.nav_done = False
+        self._lift_cmd_sent = False       # 保证 lift 命令只发一次
+        self._lift_t0 = 0.0               # 发 lift 后开始计时
+        self._scan_retries = 0            # 当前货架扫描已重试次数
 
         # QR timestamp log (新版要求)
         log_dir = os.path.expanduser("~/qr_logs")
@@ -77,6 +92,15 @@ class MissionFSM(Node):
         # Main loop @ 10 Hz
         self.timer = self.create_timer(0.1, self._loop)
         self.get_logger().info("Mission FSM ready. Waiting for START QR...")
+
+    def _enter(self, new_state):
+        """集中切状态 + 重置计时 + 清理计时 flag."""
+        self.state = new_state
+        self.state_t0 = time.time()
+        self._lift_cmd_sent = False
+
+    def _in_state_for(self) -> float:
+        return time.time() - self.state_t0
 
     def _qr_cb(self, msg):
         self.qr_recv = msg.data
@@ -94,6 +118,7 @@ class MissionFSM(Node):
         self.get_logger().info(f"[QR LOG] {workstation}={qr_content} @ {now:.3f}")
 
     def _nav_to(self, x: float, y: float, yaw: float = 0.0):
+        # 不在此处 wait_for_server: init 里已预热, 这里阻塞会卡死 timer callback.
         goal = NavigateToPose.Goal()
         goal.pose.header.frame_id = "map"
         goal.pose.header.stamp = self.get_clock().now().to_msg()
@@ -101,7 +126,6 @@ class MissionFSM(Node):
         goal.pose.pose.position.y = y
         goal.pose.pose.orientation.z = math.sin(yaw / 2.0)
         goal.pose.pose.orientation.w = math.cos(yaw / 2.0)
-        self._nav.wait_for_server()
         fut = self._nav.send_goal_async(goal)
         fut.add_done_callback(self._goal_resp_cb)
         self.nav_done = False
@@ -126,23 +150,24 @@ class MissionFSM(Node):
         s = self.state
 
         if s is State.IDLE:
-            self.state = State.SCAN_START
+            self._enter(State.SCAN_START)
 
         elif s is State.SCAN_START:
             if self.qr_recv == "START":
                 self._log_qr("START", "START")
                 self.qr_recv = None
-                self.state = State.NAV_TO_RACK
+                self._enter(State.NAV_TO_RACK)
 
         elif s is State.NAV_TO_RACK:
             if not self.rack_queue:
-                self.state = State.FINISHED
+                self._enter(State.FINISHED)
                 return
             self.current_rack = self.rack_queue[0]
+            self._scan_retries = 0
             pos = RACK_POSITIONS[self.current_rack]
             # 停在货架前 0.3m 扫描距离
             self._nav_to(pos["x"], pos["y"] - 0.30, yaw=math.pi / 2)
-            self.state = State.SCAN_RACK
+            self._enter(State.SCAN_RACK)
 
         elif s is State.SCAN_RACK:
             if not self.nav_done:
@@ -151,46 +176,76 @@ class MissionFSM(Node):
             if self.qr_recv and self.qr_recv == expected:
                 self._log_qr(f"RACK_{self.current_rack}", self.qr_recv)
                 self.qr_recv = None
-                self.state = State.APPROACH_RACK
-            elif self.qr_recv:
+                self._enter(State.APPROACH_RACK)
+                return
+            if self.qr_recv:
                 # QR 读到但不是期望的, 清除继续等
                 self.qr_recv = None
+            # 超时回退: 后退重试或跳过这个货架
+            if self._in_state_for() >= self.SCAN_TIMEOUT_SEC:
+                self._scan_retries += 1
+                if self._scan_retries <= self.MAX_SCAN_RETRIES:
+                    self.get_logger().warn(
+                        f"SCAN_RACK timeout on {self.current_rack}, retry "
+                        f"{self._scan_retries}/{self.MAX_SCAN_RETRIES} (backoff 0.15m)"
+                    )
+                    pos = RACK_POSITIONS[self.current_rack]
+                    # 后退 0.15m 重新逼近重扫
+                    self._nav_to(pos["x"], pos["y"] - 0.45, yaw=math.pi / 2)
+                    # 继续停留 SCAN_RACK, 重置计时窗口
+                    self.state_t0 = time.time()
+                else:
+                    self.get_logger().error(
+                        f"SCAN_RACK failed on {self.current_rack} after retries — skipping"
+                    )
+                    self._log_qr(f"RACK_{self.current_rack}", "SKIPPED_TIMEOUT")
+                    self.rack_queue.pop(0)
+                    self._enter(State.NAV_TO_RACK)
 
         elif s is State.APPROACH_RACK:
             pos = RACK_POSITIONS[self.current_rack]
             # 贴近到 0.05m 准备插叉
             self._nav_to(pos["x"], pos["y"] - 0.05, yaw=math.pi / 2)
-            self.state = State.LIFT_UP
+            self._enter(State.LIFT_UP)
 
         elif s is State.LIFT_UP:
             if not self.nav_done:
                 return
-            self._lift(1)
-            time.sleep(1.5)  # 伺服到位
-            self.state = State.NAV_TO_DEST
+            if not self._lift_cmd_sent:
+                self._lift(1)
+                self._lift_cmd_sent = True
+                self._lift_t0 = time.time()
+                return
+            # 非阻塞等伺服到位
+            if time.time() - self._lift_t0 >= self.LIFT_DWELL_SEC:
+                self._enter(State.NAV_TO_DEST)
 
         elif s is State.NAV_TO_DEST:
             self._nav_to(DESTINATION["x"], DESTINATION["y"], yaw=DESTINATION["yaw"])
-            self.state = State.LIFT_DOWN
+            self._enter(State.LIFT_DOWN)
 
         elif s is State.LIFT_DOWN:
             if not self.nav_done:
                 return
-            self._log_qr("DEST", "END")
-            self._lift(0)
-            time.sleep(1.5)
-            self.state = State.WAIT_STABLE
+            if not self._lift_cmd_sent:
+                self._log_qr("DEST", "END")
+                self._lift(0)
+                self._lift_cmd_sent = True
+                self._lift_t0 = time.time()
+                return
+            if time.time() - self._lift_t0 >= self.LIFT_DWELL_SEC:
+                self._enter(State.WAIT_STABLE)
 
         elif s is State.WAIT_STABLE:
             # 后退一点脱离货架
             self._nav_to(DESTINATION["x"], DESTINATION["y"] - 0.40, yaw=DESTINATION["yaw"])
-            self.state = State.CHECK_DONE
+            self._enter(State.CHECK_DONE)
 
         elif s is State.CHECK_DONE:
             if not self.nav_done:
                 return
             self.rack_queue.pop(0)
-            self.state = State.NAV_TO_RACK if self.rack_queue else State.FINISHED
+            self._enter(State.NAV_TO_RACK if self.rack_queue else State.FINISHED)
 
         elif s is State.FINISHED:
             self.get_logger().info(

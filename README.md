@@ -156,8 +156,58 @@ git add -A && git commit -m "Update team code to XXXX" && git push
 - micro-ros-agent `-b 115200`
 - 改了一边另一边必跟
 
-### USB 端口
-默认 `/dev/ttyUSB0 = ESP32`, `/dev/ttyUSB1 = LiDAR`. **顺序不固定**, 建议用 `udev/99-robot-devices.rules` 绑定 `/dev/esp32` 和 `/dev/lidar`.
+### USB 端口 (udev 绑定强烈推荐)
+
+`/dev/ttyUSB0/1` 顺序不固定, 重启可能互换导致 micro-ros-agent 打不开 ESP32. 装 udev 规则后, launch 文件默认用 `/dev/esp32` 固定路径.
+
+**一次性安装流程**:
+```bash
+# 1. 插上 ESP32 + LiDAR, 查它们的 VID/PID
+udevadm info -a -n /dev/ttyUSB0 | grep -E "idVendor|idProduct" | head -2
+udevadm info -a -n /dev/ttyUSB1 | grep -E "idVendor|idProduct" | head -2
+
+# 2. 按实际值改 rpi5_setup/udev/99-robot-devices.rules
+#    (Yahboom ESP32-S3 默认 CH340 = 1a86:7523, MS200 LiDAR 默认 CP210x = 10c4:ea60)
+
+# 3. 装规则 (rpi5_setup/install_systemd.sh 会自动做这步)
+sudo cp rpi5_setup/udev/99-robot-devices.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# 4. 拔插验证
+ls -l /dev/esp32 /dev/lidar   # 应看到 -> ttyUSB0/1 的 symlink
+```
+
+**如果没装 udev** (回退到 `/dev/ttyUSB0`):
+```bash
+ros2 launch our_robot robot_full.launch.py esp_dev:=/dev/ttyUSB0
+```
+
+### QR 时间戳 CSV 交付物 (新版赛规)
+
+FSM 每次扫到 QR 记录到:
+```
+~/qr_logs/qr_scan_log_<YYYYMMDD_HHMMSS>.csv   # 自动模式 (mission_fsm_node)
+~/qr_logs/manual_qr_log_<YYYYMMDD_HHMMSS>.csv # B-range 手动模式 (manual_mission_node)
+```
+
+比赛结束 **立刻** 从 Pi5 拷出来备份:
+```bash
+# 从另一台电脑
+scp pi@<pi5-ip>:~/qr_logs/qr_scan_log_*.csv ./submission/
+```
+
+### YOLO 可选加分项 (不上比赛)
+
+`robot_full.launch.py` **默认不启动** `yolo_detector_node`. YOLO 是演讲加分项, 需要时手动起:
+```bash
+ros2 run our_robot yolo_detector_node
+# 看检测结果: ros2 topic echo /yolo/detections/compressed (用 rqt_image_view)
+```
+
+模型已在 `ros_pkg/our_robot/models/yolov8n.onnx`. `install.sh` 会自动 pip 装 `onnxruntime` + `numpy==1.26.4`, 或手动:
+```bash
+pip3 install --break-system-packages --user -r requirements.txt
+```
 
 ---
 
