@@ -53,7 +53,7 @@ http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" \
 fi
 
 # ---------- 4. micro-ros-agent + nav2 + slam-toolbox ----------
-log "装 micro-ros-agent + nav2 + slam-toolbox"
+log "装 micro-ros-agent + nav2 + slam-toolbox + image_transport (tutorial 7 要的压缩图)"
 apt install -y \
   ros-jazzy-micro-ros-agent \
   ros-jazzy-nav2-bringup \
@@ -61,6 +61,10 @@ apt install -y \
   ros-jazzy-teleop-twist-keyboard \
   ros-jazzy-rqt-image-view \
   ros-jazzy-cv-bridge \
+  ros-jazzy-vision-opencv \
+  ros-jazzy-image-transport \
+  ros-jazzy-image-transport-plugins \
+  ros-jazzy-compressed-image-transport \
   ros-jazzy-xacro
 
 # ---------- 5. 权限 ----------
@@ -118,9 +122,10 @@ if [ -f "$(dirname "$0")/install_systemd.sh" ]; then
   bash "$(dirname "$0")/install_systemd.sh" || true
 fi
 
-# ---------- 11. Python 工具包 ----------
-log "pip 装 qrcode / pyzbar Python 包 (给脚本用)"
-sudo -u "$REAL_USER" pip3 install --break-system-packages --user qrcode pillow || true
+# ---------- 11. Python 工具包 + YOLO onnxruntime (tutorial 7 加分项) ----------
+log "pip 装 qrcode / pillow / onnxruntime / numpy (tutorial 7 指定版本)"
+sudo -u "$REAL_USER" pip3 install --break-system-packages --user \
+  qrcode pillow onnxruntime "numpy==1.26.4" || true
 
 log "完成!  重启让 camera overlay 生效: sudo reboot"
 log ""

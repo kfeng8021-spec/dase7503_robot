@@ -54,6 +54,9 @@ def generate_launch_description():
     )
 
     # 4. Camera (IMX708 via camera_ros)
+    # camera_ros 启用 image_transport, 自动发布:
+    #   /camera/image_raw (Image)
+    #   /camera/image_raw/compressed (CompressedImage)   <- qr_scanner / yolo 订阅这个
     camera = Node(
         package="camera_ros",
         executable="camera_node",

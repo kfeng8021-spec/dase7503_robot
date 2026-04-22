@@ -14,6 +14,7 @@ setup(
         (f"share/{package_name}/config", glob("config/*.yaml")),
         (f"share/{package_name}/config", glob("config/*.rviz")),
         (f"share/{package_name}/urdf", glob("urdf/*.xacro")),
+        (f"share/{package_name}/models", glob("models/*.onnx")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -29,6 +30,7 @@ setup(
             "manual_mission_node = our_robot.manual_mission_node:main",
             "battery_monitor_node = our_robot.battery_monitor_node:main",
             "odom_tf_broadcaster = our_robot.odom_tf_broadcaster:main",
+            "yolo_detector_node = our_robot.yolo_detector_node:main",
         ],
     },
 )
