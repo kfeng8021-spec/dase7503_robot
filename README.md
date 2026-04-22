@@ -142,8 +142,10 @@ scripts/
 ### 队伍 QR 串改名
 当前用 **`4X6M`** 是占位符. 队伍选定 4 位串后:
 ```bash
-# 修改 ros_pkg/our_robot/our_robot/rack_positions.py 第 30 行 TEAM_CODE
-# 然后重新生成:
+# 1. 改 ros_pkg/our_robot/our_robot/rack_positions.py 的 TEAM_CODE = "XXXX"
+# 2. 清掉旧 PNG 避免混淆
+rm -f scripts/qr_codes/RACK*.png
+# 3. 重新生成 + 打印
 python3 scripts/qr_generate.py --team XXXX --out scripts/qr_codes
 git add -A && git commit -m "Update team code to XXXX" && git push
 ```

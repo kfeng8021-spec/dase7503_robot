@@ -70,6 +70,10 @@ float target_rpm[4] = {0};                    // 四轮目标转速
 long prev_enc[4] = {0};
 unsigned long last_loop_ms = 0;
 
+// cmd_vel watchdog: agent 断线超过 CMD_TIMEOUT_MS 强制停车, 防止机器人失控跑飞
+#define CMD_TIMEOUT_MS 500
+unsigned long last_cmd_vel_ms = 0;
+
 // 里程计累积
 float pos_x = 0, pos_y = 0, theta = 0;
 
@@ -182,6 +186,7 @@ void cmd_vel_cb(const void *msgin) {
   mecanum_ik(cmd_vx, cmd_vy, cmd_wz, w);
   // 转 rad/s -> RPM 作为 PID setpoint
   for (int i = 0; i < 4; i++) target_rpm[i] = w[i] * 60.0f / (2 * PI);
+  last_cmd_vel_ms = millis();   // 喂 watchdog
 }
 
 void lifter_cb(const void *msgin) {
@@ -228,6 +233,16 @@ void odom_timer_cb(rcl_timer_t *, int64_t) {
     prev_enc[i] = c;
     float rev = (float)dc / ENC_CPR;
     w_meas[i] = rev * 2 * PI / dt;
+  }
+
+  // Watchdog: 超过 CMD_TIMEOUT_MS 没收到 /cmd_vel 强制停车.
+  // 原因: agent / USB / Pi5 任一出问题, 最后一次 target_rpm 会持续跑, 机器人飞出赛场.
+  // 首次启动 (last_cmd_vel_ms=0) 不触发, 等有第一帧 cmd_vel 再开始监控.
+  if (last_cmd_vel_ms > 0 && (now - last_cmd_vel_ms) > CMD_TIMEOUT_MS) {
+    for (int i = 0; i < 4; i++) {
+      target_rpm[i] = 0.0f;
+      pid[i].reset();
+    }
   }
 
   // 闭环: PID 输出 PWM
@@ -316,13 +331,14 @@ void setup() {
       &pub_battery, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32), "/battery_voltage"));
 
-  // header frame_id
+  // header frame_id (与 odom_tf_broadcaster 广播的 odom -> base_footprint 对齐,
+  // 以及 URDF 里 base_footprint -> base_link 的静态 TF 链一致)
   msg_odom.header.frame_id.data = (char *)"odom";
   msg_odom.header.frame_id.size = 4;
   msg_odom.header.frame_id.capacity = 5;
-  msg_odom.child_frame_id.data = (char *)"base_link";
-  msg_odom.child_frame_id.size = 9;
-  msg_odom.child_frame_id.capacity = 10;
+  msg_odom.child_frame_id.data = (char *)"base_footprint";
+  msg_odom.child_frame_id.size = 14;
+  msg_odom.child_frame_id.capacity = 15;
 
   RCCHECK(rclc_timer_init_default(&odom_timer, &support, RCL_MS_TO_NS(50), odom_timer_cb));
   RCCHECK(rclc_timer_init_default(&battery_timer, &support, RCL_MS_TO_NS(1000), battery_timer_cb));
