@@ -20,17 +20,39 @@
 
 ## 验证
 
-Pi5 上启动 agent:
+Pi5 上启动 agent (两种方式, 二选一):
+
+**方式 A — apt 装** (install.sh 默认做法):
 ```bash
 ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
 ```
 
-PC/Pi5 上:
+**方式 B — Docker** (Tutorial 5 教的方式):
 ```bash
-ros2 node list         # 应该看到 /micro_ros_node
-ros2 topic list        # 应该看到 /cmd_vel /lifter_cmd /wheel_odom
+sudo usermod -aG dialout $USER   # 首次
+sudo chmod 666 /dev/ttyUSB0
+docker run -it --rm -v /dev:/dev --privileged --net=host \
+  microros/micro-ros-agent:jazzy serial --dev /dev/ttyUSB0 -v6
+```
+
+PC/Pi5 上验证:
+```bash
+ros2 node list         # 应该看到 /hku_dase_micro_ros_node (Tutorial 5 节点名)
+ros2 topic list        # 应该看到 /cmd_vel /lifter_cmd /wheel_odom /battery_voltage /set_pid
 ros2 topic echo /wheel_odom    # 应该有数据流
 ```
+
+## 运行时调 PID (Tutorial 5 风格)
+
+不用重新烧固件就能调参数:
+```bash
+# Kp=5.0, Ki=0.3, Kd=0.05
+ros2 topic pub --once /set_pid std_msgs/msg/Float32MultiArray "{data: [5.0, 0.3, 0.05]}"
+
+# 同时看 /wheel_odom 的 twist.linear.x 回响 (rqt_plot 可视化)
+rqt_plot /wheel_odom/twist/twist/linear/x
+```
+四个电机共用同一组 PID 参数 (简单版).
 
 ## 初调 PID
 

@@ -33,6 +33,7 @@
 #include <nav_msgs/msg/odometry.h>
 #include <std_msgs/msg/int32.h>
 #include <std_msgs/msg/float32.h>
+#include <std_msgs/msg/float32_multi_array.h>
 #include <ESP32Servo.h>
 
 // ==================== 物理常量 ====================
@@ -45,11 +46,14 @@
 //   1 = 只在 A 的 RISING 触发中断 (代码当前做法, CPR=260) ← 默认, 省 CPU
 //   2 = A 的 CHANGE (双边沿, CPR=520)
 //   4 = A+B 都 CHANGE (正交解码, CPR=1040) ← 精度最高但中断频率高
-#define ENC_MULT       1
+#define ENC_MULT       2        // ISR 用 CHANGE 边沿 (Tutorial 5 风格) = 双边沿 × 1 引脚 = 2 倍频
 #define ENC_CPR        (PPR * GEAR_RATIO * ENC_MULT)
 #define M_TO_ENC       (ENC_CPR / (2 * PI * WHEEL_RADIUS))
 
 // ==================== GPIO 分配 ====================
+// 按 Yahboom MicroROS-Board (ESP32-S3) 官方引脚表.
+// 注: 教学用的 ESP32 Dev Module 引脚不同 (Tutorial 5 用 AIN1=4/AIN2=15/STB=13/PWMA=5),
+//     本项目直接按 Yahboom 实际板子走.
 const int PWM_PIN[4] = {4,  15, 9,  13};
 const int DIR_PIN[4] = {5,  16, 10, 14};
 const int ENC_A[4]   = {6,  47, 11, 1};
@@ -90,10 +94,11 @@ struct PID {
 PID pid[4];
 
 // ==================== micro-ROS 对象 ====================
-rcl_subscription_t sub_cmd_vel, sub_lifter;
+rcl_subscription_t sub_cmd_vel, sub_lifter, sub_set_pid;
 rcl_publisher_t pub_odom, pub_battery;
 geometry_msgs__msg__Twist msg_cmd_vel;
 std_msgs__msg__Int32 msg_lifter;
+std_msgs__msg__Float32MultiArray msg_set_pid;
 nav_msgs__msg__Odometry msg_odom;
 std_msgs__msg__Float32 msg_battery;
 rclc_executor_t executor;
@@ -110,10 +115,21 @@ void error_loop() {
 }
 
 // ==================== 编码器中断 ====================
-void IRAM_ATTR enc_isr_0() { enc_count[0] += (digitalRead(ENC_B[0]) ? 1 : -1); }
-void IRAM_ATTR enc_isr_1() { enc_count[1] += (digitalRead(ENC_B[1]) ? 1 : -1); }
-void IRAM_ATTR enc_isr_2() { enc_count[2] += (digitalRead(ENC_B[2]) ? 1 : -1); }
-void IRAM_ATTR enc_isr_3() { enc_count[3] += (digitalRead(ENC_B[3]) ? 1 : -1); }
+// Tutorial 5 风格: CHANGE 边沿 + `A==B ? count++ : count--` 判向.
+// 相比我之前的 RISING 边沿 ×1 倍频, CHANGE 边沿 ×2 倍频精度更高.
+// 要对应把 ENC_MULT 改成 2.
+void IRAM_ATTR enc_isr_0() {
+  if (digitalRead(ENC_A[0]) == digitalRead(ENC_B[0])) enc_count[0]++; else enc_count[0]--;
+}
+void IRAM_ATTR enc_isr_1() {
+  if (digitalRead(ENC_A[1]) == digitalRead(ENC_B[1])) enc_count[1]++; else enc_count[1]--;
+}
+void IRAM_ATTR enc_isr_2() {
+  if (digitalRead(ENC_A[2]) == digitalRead(ENC_B[2])) enc_count[2]++; else enc_count[2]--;
+}
+void IRAM_ATTR enc_isr_3() {
+  if (digitalRead(ENC_A[3]) == digitalRead(ENC_B[3])) enc_count[3]++; else enc_count[3]--;
+}
 
 // ==================== Mecanum 正/反运动学 ====================
 // 正: (vx, vy, wz) -> (w_FL, w_FR, w_RL, w_RR) 单位 rad/s
@@ -168,6 +184,21 @@ void lifter_cb(const void *msgin) {
   const std_msgs__msg__Int32 *m = (const std_msgs__msg__Int32 *) msgin;
   lifter_state = m->data;
   lifter.write(lifter_state == 1 ? 180 : 0);  // 180°=抬起, 0°=放下
+}
+
+// /set_pid 订阅: 运行时调 Kp/Ki/Kd (Tutorial 5 教的, 实用!)
+//   ros2 topic pub --once /set_pid std_msgs/msg/Float32MultiArray "{data: [8.0, 0.5, 0.1]}"
+// 四个电机共用同一组 PID 参数 (简单够用)
+void set_pid_cb(const void *msgin) {
+  const std_msgs__msg__Float32MultiArray *m = (const std_msgs__msg__Float32MultiArray *) msgin;
+  if (m->data.size >= 3) {
+    for (int i = 0; i < 4; i++) {
+      pid[i].kp = m->data.data[0];
+      pid[i].ki = m->data.data[1];
+      pid[i].kd = m->data.data[2];
+      pid[i].reset();
+    }
+  }
 }
 
 void battery_timer_cb(rcl_timer_t *, int64_t) {
@@ -239,10 +270,11 @@ void setup() {
   // ADC (电池电压)
   analogReadResolution(12);           // 0-4095
   analogSetAttenuation(ADC_11db);     // 0-3.3V 量程
-  attachInterrupt(digitalPinToInterrupt(ENC_A[0]), enc_isr_0, RISING);
-  attachInterrupt(digitalPinToInterrupt(ENC_A[1]), enc_isr_1, RISING);
-  attachInterrupt(digitalPinToInterrupt(ENC_A[2]), enc_isr_2, RISING);
-  attachInterrupt(digitalPinToInterrupt(ENC_A[3]), enc_isr_3, RISING);
+  // CHANGE 边沿跟 ISR 里 `A==B` 判向配套 (Tutorial 5 教的方法)
+  attachInterrupt(digitalPinToInterrupt(ENC_A[0]), enc_isr_0, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENC_A[1]), enc_isr_1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENC_A[2]), enc_isr_2, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENC_A[3]), enc_isr_3, CHANGE);
 
   lifter.attach(SERVO_PIN);
   lifter.write(0);
@@ -252,7 +284,8 @@ void setup() {
   // micro-ROS init
   allocator = rcl_get_default_allocator();
   RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
-  RCCHECK(rclc_node_init_default(&node, "micro_ros_node", "", &support));
+  // 节点名跟 Tutorial 5 对齐: 老师课程要求的命名
+  RCCHECK(rclc_node_init_default(&node, "hku_dase_micro_ros_node", "", &support));
 
   RCCHECK(rclc_subscription_init_default(
       &sub_cmd_vel, &node,
@@ -261,6 +294,15 @@ void setup() {
   RCCHECK(rclc_subscription_init_default(
       &sub_lifter, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32), "/lifter_cmd"));
+
+  RCCHECK(rclc_subscription_init_default(
+      &sub_set_pid, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32MultiArray), "/set_pid"));
+  // 给 msg_set_pid 预分配内存 (Tutorial 5 用 micro_ros_utilities, 这里手动简单分配)
+  static float _pid_buf[8];
+  msg_set_pid.data.data = _pid_buf;
+  msg_set_pid.data.capacity = 8;
+  msg_set_pid.data.size = 0;
 
   RCCHECK(rclc_publisher_init_default(
       &pub_odom, &node,
@@ -281,9 +323,10 @@ void setup() {
   RCCHECK(rclc_timer_init_default(&odom_timer, &support, RCL_MS_TO_NS(50), odom_timer_cb));
   RCCHECK(rclc_timer_init_default(&battery_timer, &support, RCL_MS_TO_NS(1000), battery_timer_cb));
 
-  RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &sub_cmd_vel, &msg_cmd_vel, &cmd_vel_cb, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sub_lifter, &msg_lifter, &lifter_cb, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sub_set_pid, &msg_set_pid, &set_pid_cb, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
   RCCHECK(rclc_executor_add_timer(&executor, &battery_timer));
 
