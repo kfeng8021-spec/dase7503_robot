@@ -149,15 +149,19 @@ void mecanum_fk(float *w, float &vx, float &vy, float &wz) {
   wz = R / (4.0f * L) * (-w[0] + w[1] - w[2] + w[3]);
 }
 
-// ==================== 电机驱动 (LEDC, ESP32 Arduino Core 3.x) ====================
-// 用 LEDC 硬件 PWM 而不是 analogWrite, 可配频率/分辨率, 消除 5kHz 嘶叫
+// ==================== 电机驱动 (LEDC, 兼容 ESP32 Core 2.0.17 和 3.x) ====================
+// 用 LEDC 硬件 PWM 而不是 analogWrite, 可配频率/分辨率, 消除 5kHz 嘶叫.
+// 老师 Tutorial 3/4 明确指定 ESP32 Core v2.0.17, 所以这里用 v2.x API
+// (ledcSetup + ledcAttachPin + ledcWrite(channel, duty)),
+// 这组 API 在 v3.x 上仍然兼容 (只有 deprecation warning), 两版都能编.
 #define PWM_FREQ   20000   // 20kHz, 超出人耳范围
 #define PWM_RES    8       // 8-bit -> 0-255
 #define LEDC_CH(i) (i)     // 四个电机各占一个 LEDC channel 0-3
 
 void pwm_setup() {
   for (int i = 0; i < 4; i++) {
-    ledcAttach(PWM_PIN[i], PWM_FREQ, PWM_RES);  // Arduino Core 3.x API
+    ledcSetup(LEDC_CH(i), PWM_FREQ, PWM_RES);     // channel, freq, resolution
+    ledcAttachPin(PWM_PIN[i], LEDC_CH(i));        // pin → channel
   }
 }
 
@@ -165,7 +169,7 @@ void set_motor_pwm(int i, float pwm_val) {
   bool forward = pwm_val >= 0;
   digitalWrite(DIR_PIN[i], forward ? HIGH : LOW);
   int duty = constrain((int)fabs(pwm_val), 0, 255);
-  ledcWrite(PWM_PIN[i], duty);
+  ledcWrite(LEDC_CH(i), duty);   // 写 channel 而不是 pin (v2.x API)
 }
 
 // ==================== 回调 ====================

@@ -39,17 +39,20 @@ apt install -y curl gnupg lsb-release software-properties-common \
 
 # ---------- 3. ROS 2 Jazzy apt 源 ----------
 if ! dpkg -l ros-jazzy-ros-base >/dev/null 2>&1; then
-  log "添加 ROS 2 apt 源"
+  log "添加 ROS 2 apt 源 (Tutorial 1 教的新版 ros-apt-source 方法)"
   add-apt-repository -y universe
-  curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
-    -o /usr/share/keyrings/ros-archive-keyring.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
-http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" \
-    > /etc/apt/sources.list.d/ros2.list
+
+  # 新方法: 装 ros-apt-source .deb 包, 自动维护 GPG key 和 source list
+  # 老方法 (curl ros.key + 手写 sources.list.d) 仍可用但被 ROS infra 淘汰
+  ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
+  UBUNTU_CODENAME=$(. /etc/os-release && echo $VERSION_CODENAME)
+  curl -L -o /tmp/ros2-apt-source.deb \
+    "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.${UBUNTU_CODENAME}_all.deb"
+  apt install -y /tmp/ros2-apt-source.deb
   apt update
 
-  log "装 ROS 2 Jazzy base (如果需要 GUI rviz 换成 ros-jazzy-desktop, ~1GB)"
-  apt install -y ros-jazzy-ros-base ros-jazzy-rmw-cyclonedds-cpp
+  log "装 ROS 2 Jazzy desktop (有 RViz/rqt GUI, Tutorial 1/6 都用 desktop 版)"
+  apt install -y ros-jazzy-desktop ros-jazzy-ros-base ros-jazzy-rmw-cyclonedds-cpp
 fi
 
 # ---------- 4. micro-ros-agent + nav2 + slam-toolbox ----------

@@ -3,10 +3,12 @@
 ## 烧录步骤
 
 1. **装 Arduino IDE 2.x** (arduino.cc/en/software)
-2. **装 ESP32 Arduino Core**
+2. **装 ESP32 Arduino Core v2.0.17** (Tutorial 3/4 老师指定)
    - File → Preferences → Additional Board URLs:
      `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
-   - Boards Manager → 搜索 `esp32` → 安装 ESP32 3.0+
+   - Boards Manager → 搜索 `esp32` → 安装 **`2.0.17`** (不是最新!)
+   - 本固件的 LEDC API 用 v2.x 风格 (ledcSetup + ledcAttachPin + ledcWrite(channel, duty)),
+     在 v2.0.17 和 v3.x 上都能编译
 3. **装 micro_ros_arduino 库 (Jazzy 分支)**
    - 下载 zip: https://github.com/micro-ROS/micro_ros_arduino/releases/tag/v2.0.7-jazzy
    - Arduino IDE: Sketch → Include Library → Add .ZIP Library → 选 zip
