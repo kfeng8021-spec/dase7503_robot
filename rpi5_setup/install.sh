@@ -113,6 +113,22 @@ sudo -u "$REAL_USER" bash -c "
   MAKEFLAGS='-j2' colcon build --parallel-workers 2 --event-handlers console_direct+
 "
 
+# Workaround: setuptools 68 + colcon-ros 0.5 在 Ubuntu 24.04 上把 ament_python
+# 的 console_scripts 装到 install/our_robot/bin/ 而非 lib/our_robot/,
+# 导致 ros2 run 找不到节点. symlink 补回来.
+log "修补 our_robot 节点位置 (bin -> lib/our_robot)"
+sudo -u "$REAL_USER" bash -c "
+  BIN='$WS/install/our_robot/bin'
+  LIB='$WS/install/our_robot/lib/our_robot'
+  if [ -d \"\$BIN\" ]; then
+    mkdir -p \"\$LIB\"
+    for f in \"\$BIN\"/*; do
+      [ -e \"\$f\" ] || continue
+      ln -sf \"../../bin/\$(basename \"\$f\")\" \"\$LIB/\$(basename \"\$f\")\"
+    done
+  fi
+"
+
 # ---------- 9. workspace setup in bashrc ----------
 sudo -u "$REAL_USER" bash -c "
   grep -q 'source $WS/install/setup.bash' $REAL_HOME/.bashrc || \
