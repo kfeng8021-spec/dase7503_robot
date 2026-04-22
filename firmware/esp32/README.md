@@ -10,7 +10,8 @@
    - 本固件的 LEDC API 用 v2.x 风格 (ledcSetup + ledcAttachPin + ledcWrite(channel, duty)),
      在 v2.0.17 和 v3.x 上都能编译
 3. **装 micro_ros_arduino 库 (Jazzy 分支)**
-   - 下载 zip: https://github.com/micro-ROS/micro_ros_arduino/releases/tag/v2.0.7-jazzy
+   - 下载 zip: https://github.com/micro-ROS/micro_ros_arduino/releases/tag/v2.0.8-jazzy
+     (注: v2.0.7 没发 jazzy 分支, 直接用 v2.0.8)
    - Arduino IDE: Sketch → Include Library → Add .ZIP Library → 选 zip
 4. **装 ESP32Servo 库**
    - Library Manager → 搜 `ESP32Servo` by Kevin Harrington → 装
@@ -24,17 +25,19 @@
 
 Pi5 上启动 agent (两种方式, 二选一):
 
-**方式 A — apt 装** (install.sh 默认做法):
+**方式 A — 源码编译** (rpi5_setup/install.sh 做的, Jazzy apt 源没 agent 包):
 ```bash
-ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
+# 在 ros2_ws 里 clone + colcon build 好了以后:
+source /opt/ros/jazzy/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/esp32 -b 115200
 ```
 
-**方式 B — Docker** (Tutorial 5 教的方式):
+**方式 B — Docker** (省心, 不用 superbuild):
 ```bash
 sudo usermod -aG dialout $USER   # 首次
-sudo chmod 666 /dev/ttyUSB0
 docker run -it --rm -v /dev:/dev --privileged --net=host \
-  microros/micro-ros-agent:jazzy serial --dev /dev/ttyUSB0 -v6
+  microros/micro-ros-agent:jazzy serial --dev /dev/esp32 -v6
 ```
 
 PC/Pi5 上验证:

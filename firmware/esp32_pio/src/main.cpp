@@ -24,7 +24,8 @@
  *   编码器 PPR=13, 减速比 1:20 -> 4倍频下 CPR=1040
  */
 
-#include <micro_ros_arduino.h>
+#include <Arduino.h>
+#include <micro_ros_platformio.h>
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
@@ -273,10 +274,10 @@ void odom_timer_cb(rcl_timer_t *, int64_t) {
 
 // ==================== 初始化 ====================
 void setup() {
-  // micro-ros-arduino v2.0.8+ 统一 API: set_microros_transports() 内部
-  // 自己调 Serial.begin(115200). agent 那边必须也用 -b 115200.
-  // (v2.0.7 及以前是 set_microros_serial_transports(Serial), 新版没了)
-  set_microros_transports();
+  // PlatformIO + micro_ros_platformio: 显式 Serial.begin + transport bind.
+  // (micro_ros_platformio 的 API 保持 v2.0.7 风格, 要传 Serial 参数)
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
 
   pinMode(LED_BUILTIN, OUTPUT);
 
