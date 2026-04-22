@@ -25,7 +25,7 @@ tmux send-keys -t $SESSION "echo '=== micro-ROS Agent ===' && source /opt/ros/ja
 tmux split-window -h -t $SESSION
 tmux send-keys -t $SESSION 'echo "=== LiDAR ===" && source /opt/ros/jazzy/setup.bash && \
   source ~/ros2_ws/install/setup.bash && \
-  ros2 launch ydlidar_ros2_driver ydlidar_launch.py' C-m
+  ros2 launch oradar_lidar ms200_scan.launch.py' C-m
 
 # Pane 2: camera + qr
 tmux split-window -v -t $SESSION

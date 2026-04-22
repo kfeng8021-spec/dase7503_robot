@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# RPi5 Ubuntu 24.04 一键部署 ROS 2 Jazzy + micro-ros-agent + camera_ros + lidar + nav2
+# RPi5 Ubuntu 24.04 一键部署 ROS 2 Jazzy + 源码 build micro_ros_agent / oradar_lidar / camera_ros + nav2 + slam-toolbox.
 # 按 Full Plan + Camera setup PDF + Yahboom 官方文档整合.
+# 注: Jazzy apt 源没 micro_ros_agent 包, 改为源码 colcon build (superbuild).
 #
 # 用法 (Pi5 上):
 #   cd ~/dase7503_robot/rpi5_setup
@@ -55,10 +56,11 @@ if ! dpkg -l ros-jazzy-ros-base >/dev/null 2>&1; then
   apt install -y ros-jazzy-desktop ros-jazzy-ros-base ros-jazzy-rmw-cyclonedds-cpp
 fi
 
-# ---------- 4. micro-ros-agent + nav2 + slam-toolbox ----------
-log "装 micro-ros-agent + nav2 + slam-toolbox + image_transport (tutorial 7 要的压缩图)"
+# ---------- 4. nav2 + slam-toolbox + image_transport ----------
+# 注: micro-ros-agent 在 Jazzy apt 源没打包(只有 msgs), 改到 section 8
+# 从源码 colcon build (superbuild 自动拉 Micro-XRCE-DDS-Agent + spdlog 等).
+log "装 nav2 + slam-toolbox + image_transport (tutorial 7 要的压缩图)"
 apt install -y \
-  ros-jazzy-micro-ros-agent \
   ros-jazzy-nav2-bringup \
   ros-jazzy-slam-toolbox \
   ros-jazzy-teleop-twist-keyboard \
@@ -93,12 +95,16 @@ sudo -u "$REAL_USER" bash -c "
 "
 
 # ---------- 8. 工作区 + 源码编译包 ----------
-log "创建 ros2_ws 并 clone libcamera + camera_ros + ydlidar_ros2_driver"
+log "创建 ros2_ws 并 clone libcamera + camera_ros + oradar_lidar + micro_ros_agent"
 sudo -u "$REAL_USER" mkdir -p "$WS/src"
 cd "$WS/src"
 [ ! -d libcamera ] && sudo -u "$REAL_USER" git clone --depth 1 https://github.com/raspberrypi/libcamera.git
 [ ! -d camera_ros ] && sudo -u "$REAL_USER" git clone --depth 1 https://github.com/christianrauch/camera_ros.git
-[ ! -d ydlidar_ros2_driver ] && sudo -u "$REAL_USER" git clone --depth 1 https://github.com/YDLIDAR/ydlidar_ros2_driver.git
+# ORADAR MS200 LiDAR 官方驱动 (实车用的, 不是 ydlidar)
+[ ! -d oradar_lidar ] && sudo -u "$REAL_USER" git clone --depth 1 https://github.com/OradarLidar/oradar_ros2_sdk.git oradar_lidar
+# micro_ros_agent: ROS 2 Jazzy apt 源没打包, 必须源码 superbuild (CMake 会自动拉
+# Micro-XRCE-DDS-Agent + spdlog 等依赖, 首次 build 吃 10-20 分钟 + 网络)
+[ ! -d micro_ros_agent ] && sudo -u "$REAL_USER" git clone --depth 1 -b jazzy https://github.com/micro-ROS/micro-ROS-Agent.git micro_ros_agent
 
 # 符号链接我们自己的 our_robot 包
 if [ -d "$REAL_HOME/dase7503_robot/ros_pkg/our_robot" ] && [ ! -L "$WS/src/our_robot" ]; then
@@ -151,7 +157,7 @@ log ""
 log "重启后验证步骤:"
 log "  1) ros2 topic list                    # 应看到基础话题"
 log "  2) ros2 run camera_ros camera_node    # 应看到 /camera/image_raw"
-log "  3) ros2 launch ydlidar_ros2_driver ydlidar_launch.py  # 应看到 /scan"
+log "  3) ros2 launch oradar_lidar ms200_scan.launch.py  # 应看到 /scan"
 log "  4) 烧 ESP32 固件 (firmware/esp32/) 后: ros2 topic echo /wheel_odom"
 log "  5) scripts/test_motor_straight.py     # 验证电机方向 + PID"
 log "  6) 赛前 SLAM 建图: ros2 launch our_robot slam_mapping.launch.py"

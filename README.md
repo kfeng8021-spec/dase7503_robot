@@ -32,7 +32,7 @@ python3 scripts/test_motor_straight.py
 python3 scripts/test_qr_matrix.py
 
 # 3. LiDAR 验收
-ros2 launch ydlidar_ros2_driver ydlidar_launch.py
+ros2 launch oradar_lidar ms200_scan.launch.py
 ros2 topic hz /scan   # 应 10-15 Hz
 
 # 4. 相机标定

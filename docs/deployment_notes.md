@@ -65,7 +65,7 @@ ros2 run camera_calibration cameracalibrator \
 ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/esp32 -b 115200
 
 # 终端 2: LiDAR
-ros2 launch ydlidar_ros2_driver ydlidar_launch.py
+ros2 launch oradar_lidar ms200_scan.launch.py
 
 # 终端 3: SLAM
 ros2 launch slam_toolbox online_async_launch.py use_sim_time:=false

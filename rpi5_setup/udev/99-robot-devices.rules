@@ -11,11 +11,8 @@
 #
 # 代码里用 /dev/esp32 和 /dev/lidar 不用再关心 ttyUSB 编号.
 
-# Yahboom ESP32-S3 MicroROS-Board (CH340 USB-Serial)
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="esp32", MODE="0666", GROUP="dialout"
+# Yahboom ESP32-S3 MicroROS-Board (CP2102 USB-UART Bridge, 实测 VID/PID)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="esp32", MODE="0666", GROUP="dialout"
 
-# MS200 LiDAR (CH343, 序列号 597C003280)
+# MS200 LiDAR (CH343, 实测序列号 597C003280 区分 ESP32 的 CH343 烧录桥)
 SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", ATTRS{serial}=="597C003280", SYMLINK+="lidar", MODE="0666", GROUP="dialout"
-
-# 如果 ESP32 用 CP2102 而不是 CH340, 取消注释这行并注释上面的 ESP32 那行
-# SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="<填序列号>", SYMLINK+="esp32", MODE="0666", GROUP="dialout"

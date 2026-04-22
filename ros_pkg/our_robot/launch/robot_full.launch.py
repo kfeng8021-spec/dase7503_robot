@@ -45,12 +45,12 @@ def generate_launch_description():
         output="log",
     )
 
-    # 3. LiDAR (MS200)
+    # 3. LiDAR (Oradar MS200)
     lidar = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
-                FindPackageShare("ydlidar_ros2_driver"),
-                "launch", "ydlidar_launch.py",
+                FindPackageShare("oradar_lidar"),
+                "launch", "ms200_scan.launch.py",
             ])
         ])
     )
