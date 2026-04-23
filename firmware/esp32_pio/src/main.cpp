@@ -35,6 +35,7 @@
 #include <std_msgs/msg/int32.h>
 #include <std_msgs/msg/float32.h>
 #include <std_msgs/msg/float32_multi_array.h>
+#include <std_msgs/msg/bool.h>
 #include <ESP32Servo.h>
 
 // ==================== 物理常量 ====================
@@ -81,6 +82,20 @@ unsigned long last_loop_ms = 0;
 unsigned long last_cmd_vel_ms = 0;
 unsigned long boot_time_ms = 0;
 
+// ==================== 安全限幅 (bench test OK 后可放开) ====================
+// 四层保护:
+//   1. 输入层: cmd_vel 速度上限 (防止遥控/Nav2 发过大指令)
+//   2. 运算层: target_rpm 上限 (防止 IK 计算出过大轮速)
+//   3. 输出层: PWM 占空比上限 (防 PID 饱和冲过电机上限)
+//   4. 急停: /emergency_stop Bool topic (pub true 立刻归零 + 锁)
+// 实车调 PID 验收后可把 PWM_CAP 提到 255, MAX_TARGET_RPM 放宽.
+#define MAX_LINEAR_VEL   0.20f   // m/s, 慢速 bench test 档 (Full Plan 目标 0.3, 先 2/3)
+#define MAX_ANGULAR_VEL  1.0f    // rad/s
+#define MAX_TARGET_RPM   80.0f   // 减速后输出端最大 80 RPM ≈ 0.27 m/s
+#define PWM_CAP          180     // 0-255, 180 ≈ 70% duty
+
+bool emergency_stop = false;
+
 // 里程计累积
 float pos_x = 0, pos_y = 0, theta = 0;
 
@@ -105,7 +120,7 @@ struct PID {
 PID pid[4];
 
 // ==================== micro-ROS 对象 ====================
-rcl_subscription_t sub_cmd_vel, sub_lifter, sub_set_pid;
+rcl_subscription_t sub_cmd_vel, sub_lifter, sub_set_pid, sub_estop;
 rcl_publisher_t pub_odom, pub_battery;
 geometry_msgs__msg__Twist msg_cmd_vel;
 std_msgs__msg__Int32 msg_lifter;
@@ -179,21 +194,39 @@ void pwm_setup() {
 void set_motor_pwm(int i, float pwm_val) {
   bool forward = pwm_val >= 0;
   digitalWrite(DIR_PIN[i], forward ? HIGH : LOW);
-  int duty = constrain((int)fabs(pwm_val), 0, 255);
+  int duty = constrain((int)fabs(pwm_val), 0, PWM_CAP);  // PWM 输出层硬限幅
   ledcWrite(LEDC_CH(i), duty);   // 写 channel 而不是 pin (v2.x API)
 }
 
 // ==================== 回调 ====================
 void cmd_vel_cb(const void *msgin) {
   const geometry_msgs__msg__Twist *m = (const geometry_msgs__msg__Twist *) msgin;
-  cmd_vx = m->linear.x;
-  cmd_vy = m->linear.y;
-  cmd_wz = m->angular.z;
+  // 输入层 1: cmd_vel 速度硬限幅 (无视遥控/Nav2 可能发的大值)
+  cmd_vx = constrain((float)m->linear.x,  -MAX_LINEAR_VEL,  MAX_LINEAR_VEL);
+  cmd_vy = constrain((float)m->linear.y,  -MAX_LINEAR_VEL,  MAX_LINEAR_VEL);
+  cmd_wz = constrain((float)m->angular.z, -MAX_ANGULAR_VEL, MAX_ANGULAR_VEL);
   float w[4];
   mecanum_ik(cmd_vx, cmd_vy, cmd_wz, w);
-  // 转 rad/s -> RPM 作为 PID setpoint
-  for (int i = 0; i < 4; i++) target_rpm[i] = w[i] * 60.0f / (2 * PI);
+  // 运算层 2: target_rpm 硬限幅 (防 IK 算出的轮速超限)
+  for (int i = 0; i < 4; i++) {
+    float rpm = w[i] * 60.0f / (2 * PI);
+    target_rpm[i] = constrain(rpm, -MAX_TARGET_RPM, MAX_TARGET_RPM);
+  }
   last_cmd_vel_ms = millis();   // 喂 watchdog
+}
+
+// 急停订阅: pub true 立刻停车 + 锁死, pub false 解除
+//   ros2 topic pub --once /emergency_stop std_msgs/msg/Bool "{data: true}"
+void estop_cb(const void *msgin) {
+  const std_msgs__msg__Bool *m = (const std_msgs__msg__Bool *) msgin;
+  emergency_stop = m->data;
+  if (emergency_stop) {
+    for (int i = 0; i < 4; i++) {
+      target_rpm[i] = 0;
+      pid[i].reset();
+      set_motor_pwm(i, 0);
+    }
+  }
 }
 
 void lifter_cb(const void *msgin) {
@@ -242,13 +275,14 @@ void odom_timer_cb(rcl_timer_t *, int64_t) {
     w_meas[i] = rev * 2 * PI / dt;
   }
 
-  // SAFETY (启动宽限期 + cmd 新鲜度双保险, 任一不满足 → 直接 PWM=0 不跑 PID):
+  // SAFETY (启动宽限期 + cmd 新鲜度 + 急停三重保险, 任一不满足 → PWM=0 不跑 PID):
   //   ① 启动后 MOTOR_ARM_GRACE_MS 内强制停车 (等 encoder 稳定 + agent 建连)
   //   ② 从未收 cmd_vel 或上次 >CMD_TIMEOUT_MS 前 → 停车
-  // 只有两项都满足才 armed, 跑闭环 PID.
+  //   ③ /emergency_stop 话题 pub true → 停车 + 锁死 (直到 pub false)
+  // 三项全满足才 armed, 跑闭环 PID.
   bool in_grace = (now - boot_time_ms) < MOTOR_ARM_GRACE_MS;
   bool cmd_fresh = (last_cmd_vel_ms > 0) && (now - last_cmd_vel_ms) <= CMD_TIMEOUT_MS;
-  bool motor_armed = !in_grace && cmd_fresh;
+  bool motor_armed = !in_grace && cmd_fresh && !emergency_stop;
 
   if (!motor_armed) {
     for (int i = 0; i < 4; i++) {
@@ -349,6 +383,11 @@ void setup() {
       &pub_battery, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32), "/battery_voltage"));
 
+  // /emergency_stop 急停订阅 (安全层 ③)
+  RCCHECK(rclc_subscription_init_default(
+      &sub_estop, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Bool), "/emergency_stop"));
+
   // header frame_id (与 odom_tf_broadcaster 广播的 odom -> base_footprint 对齐,
   // 以及 URDF 里 base_footprint -> base_link 的静态 TF 链一致)
   msg_odom.header.frame_id.data = (char *)"odom";
@@ -361,10 +400,13 @@ void setup() {
   RCCHECK(rclc_timer_init_default(&odom_timer, &support, RCL_MS_TO_NS(50), odom_timer_cb));
   RCCHECK(rclc_timer_init_default(&battery_timer, &support, RCL_MS_TO_NS(1000), battery_timer_cb));
 
-  RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 6, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &sub_cmd_vel, &msg_cmd_vel, &cmd_vel_cb, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sub_lifter, &msg_lifter, &lifter_cb, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sub_set_pid, &msg_set_pid, &set_pid_cb, ON_NEW_DATA));
+
+  static std_msgs__msg__Bool msg_estop;
+  RCCHECK(rclc_executor_add_subscription(&executor, &sub_estop, &msg_estop, &estop_cb, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
   RCCHECK(rclc_executor_add_timer(&executor, &battery_timer));
 

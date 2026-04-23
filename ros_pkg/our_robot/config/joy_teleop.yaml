@@ -1,0 +1,30 @@
+# USB 手柄遥控映射 (Xbox / PS4 通用布局)
+# teleop_twist_joy 节点使用.
+#
+# Xbox 手柄默认轴/键映射 (由 joy_node 决定):
+#   axes[0] = 左摇杆 X (左右)     axes[1] = 左摇杆 Y (上下)
+#   axes[2] = L2 扳机              axes[3] = 右摇杆 X
+#   axes[4] = 右摇杆 Y             axes[5] = R2 扳机
+#   axes[6] = D-pad X              axes[7] = D-pad Y
+#   buttons[0]=A, [1]=B, [2]=X, [3]=Y
+#   buttons[4]=LB, [5]=RB
+#   buttons[6]=Back, [7]=Start
+
+teleop_twist_joy_node:
+  ros__parameters:
+    require_enable_button: true
+    enable_button: 4       # LB (左肩键): 按住才能动, 安全第一
+    enable_turbo_button: 5 # RB (右肩键): 按住加速
+
+    # 线速度 (m/s)
+    axis_linear.x: 1       # 左摇杆 Y = 前后
+    axis_linear.y: 0       # 左摇杆 X = 左右平移 (Mecanum 专用)
+    scale_linear.x: 0.30   # 慢速: LB 单按, vx ≤ 0.3 m/s
+    scale_linear.y: 0.30
+    scale_linear_turbo.x: 0.50   # 快速: LB+RB, vx ≤ 0.5 m/s
+    scale_linear_turbo.y: 0.50
+
+    # 角速度 (rad/s)
+    axis_angular.yaw: 3    # 右摇杆 X = 左右转
+    scale_angular.yaw: 1.0
+    scale_angular_turbo.yaw: 1.5
