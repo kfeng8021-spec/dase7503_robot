@@ -71,9 +71,15 @@ float target_rpm[4] = {0};                    // 四轮目标转速
 long prev_enc[4] = {0};
 unsigned long last_loop_ms = 0;
 
-// cmd_vel watchdog: agent 断线超过 CMD_TIMEOUT_MS 强制停车, 防止机器人失控跑飞
-#define CMD_TIMEOUT_MS 500
+// cmd_vel watchdog + 启动宽限期保护机器不跑飞:
+//   MOTOR_ARM_GRACE_MS: 启动后前 3s 强制 PWM=0, 让 encoder ISR 噪声稳定 + agent 建连
+//   CMD_TIMEOUT_MS: 之后需持续收 cmd_vel (间隔 <500ms), 否则再次归零停车
+// 事故教训 (2026-04-22): 旧版仅 "last_cmd_vel_ms > 0 且超时" 才归零, 启动时 watchdog
+// 不生效, PID 对 encoder 噪声放大 → 电机失控. 新版默认=紧急停车, 必须显式 armed 才释放.
+#define CMD_TIMEOUT_MS      500
+#define MOTOR_ARM_GRACE_MS  3000
 unsigned long last_cmd_vel_ms = 0;
+unsigned long boot_time_ms = 0;
 
 // 里程计累积
 float pos_x = 0, pos_y = 0, theta = 0;
@@ -236,21 +242,27 @@ void odom_timer_cb(rcl_timer_t *, int64_t) {
     w_meas[i] = rev * 2 * PI / dt;
   }
 
-  // Watchdog: 超过 CMD_TIMEOUT_MS 没收到 /cmd_vel 强制停车.
-  // 原因: agent / USB / Pi5 任一出问题, 最后一次 target_rpm 会持续跑, 机器人飞出赛场.
-  // 首次启动 (last_cmd_vel_ms=0) 不触发, 等有第一帧 cmd_vel 再开始监控.
-  if (last_cmd_vel_ms > 0 && (now - last_cmd_vel_ms) > CMD_TIMEOUT_MS) {
+  // SAFETY (启动宽限期 + cmd 新鲜度双保险, 任一不满足 → 直接 PWM=0 不跑 PID):
+  //   ① 启动后 MOTOR_ARM_GRACE_MS 内强制停车 (等 encoder 稳定 + agent 建连)
+  //   ② 从未收 cmd_vel 或上次 >CMD_TIMEOUT_MS 前 → 停车
+  // 只有两项都满足才 armed, 跑闭环 PID.
+  bool in_grace = (now - boot_time_ms) < MOTOR_ARM_GRACE_MS;
+  bool cmd_fresh = (last_cmd_vel_ms > 0) && (now - last_cmd_vel_ms) <= CMD_TIMEOUT_MS;
+  bool motor_armed = !in_grace && cmd_fresh;
+
+  if (!motor_armed) {
     for (int i = 0; i < 4; i++) {
       target_rpm[i] = 0.0f;
       pid[i].reset();
+      set_motor_pwm(i, 0.0f);   // 绕过 PID 直接写 0, 避免 PID integral 漏下去
     }
-  }
-
-  // 闭环: PID 输出 PWM
-  for (int i = 0; i < 4; i++) {
-    float rpm = w_meas[i] * 60.0f / (2 * PI);
-    float u = pid[i].compute(target_rpm[i], rpm, dt);
-    set_motor_pwm(i, u);
+  } else {
+    // 闭环: PID 输出 PWM (仅 armed 时)
+    for (int i = 0; i < 4; i++) {
+      float rpm = w_meas[i] * 60.0f / (2 * PI);
+      float u = pid[i].compute(target_rpm[i], rpm, dt);
+      set_motor_pwm(i, u);
+    }
   }
 
   // 里程计累积
@@ -281,13 +293,16 @@ void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
 
-  // GPIO + LEDC PWM
+  // GPIO + LEDC PWM — 启动立刻写 DIR=LOW 和 PWM=0, 任何时候上电不会失控
   for (int i = 0; i < 4; i++) {
     pinMode(DIR_PIN[i], OUTPUT);
+    digitalWrite(DIR_PIN[i], LOW);
     pinMode(ENC_A[i], INPUT_PULLUP);
     pinMode(ENC_B[i], INPUT_PULLUP);
   }
   pwm_setup();
+  for (int i = 0; i < 4; i++) set_motor_pwm(i, 0.0f);   // PWM 紧急归零
+  boot_time_ms = millis();                               // ARM GRACE 起算点
 
   // ADC (电池电压)
   analogReadResolution(12);           // 0-4095

@@ -8,9 +8,12 @@ set -e
 [ "$(id -u)" -eq 0 ] || { echo "sudo 跑"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "[systemd] 复制服务文件到 /etc/systemd/system/"
-cp "$SCRIPT_DIR/systemd/micro-ros-agent.service" /etc/systemd/system/
-cp "$SCRIPT_DIR/systemd/robot.service" /etc/systemd/system/
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+echo "[systemd] 复制服务文件到 /etc/systemd/system/ (User=$REAL_USER)"
+for svc in micro-ros-agent.service robot.service; do
+  sed -e "s|{{USER}}|$REAL_USER|g" -e "s|{{HOME}}|$REAL_HOME|g"     "$SCRIPT_DIR/systemd/$svc" > /etc/systemd/system/$svc
+done
 
 echo "[udev] 复制规则到 /etc/udev/rules.d/"
 cp "$SCRIPT_DIR/udev/99-robot-devices.rules" /etc/udev/rules.d/

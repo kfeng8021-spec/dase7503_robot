@@ -12,3 +12,4 @@ log/
 ros_pkg/our_robot/maps/gamefield_map.*
 !ros_pkg/our_robot/maps/.gitkeep
 scripts/qr_scan_log_*.csv
+firmware/esp32_pio/.pio/

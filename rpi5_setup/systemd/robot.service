@@ -5,8 +5,8 @@ Requires=micro-ros-agent.service
 
 [Service]
 Type=simple
-User=dase
-Environment="HOME=/home/dase"
+User={{USER}}
+Environment="HOME={{HOME}}"
 Environment="ROS_DOMAIN_ID=0"
 Environment="RMW_IMPLEMENTATION=rmw_cyclonedds_cpp"
 WorkingDirectory=/home/dase
