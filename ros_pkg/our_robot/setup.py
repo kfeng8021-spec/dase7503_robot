@@ -31,6 +31,7 @@ setup(
             "battery_monitor_node = our_robot.battery_monitor_node:main",
             "odom_tf_broadcaster = our_robot.odom_tf_broadcaster:main",
             "yolo_detector_node = our_robot.yolo_detector_node:main",
+            "laser_safety_node = our_robot.laser_safety_node:main",
         ],
     },
 )

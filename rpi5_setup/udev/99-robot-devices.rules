@@ -14,5 +14,5 @@
 # Yahboom ESP32-S3 MicroROS-Board (CP2102 USB-UART Bridge, 实测 VID/PID)
 SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="esp32", MODE="0666", GROUP="dialout"
 
-# MS200 LiDAR (CH343, 实测序列号 597C003280 区分 ESP32 的 CH343 烧录桥)
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", ATTRS{serial}=="597C003280", SYMLINK+="lidar", MODE="0666", GROUP="dialout"
+# MS200 LiDAR (CH343 1a86:55d4) — 本机上唯一的 CH343 设备就是 LiDAR, 不锁序列号更稳
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", SYMLINK+="lidar", MODE="0666", GROUP="dialout"
