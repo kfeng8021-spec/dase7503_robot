@@ -51,7 +51,7 @@ class MissionFSM(Node):
     LIFT_DWELL_SEC = 1.5       # 升降机构伺服到位时间
     SCAN_TIMEOUT_SEC = 10.0    # 扫不到 QR 的超时
     MAX_SCAN_RETRIES = 2       # 单个货架最多重扫次数
-    MISSION_BUDGET_SEC = 8 * 60  # 比赛 8 分钟硬上限 (2026-04-20 规则)
+    MISSION_BUDGET_SEC = 3 * 60  # 比赛 3 分钟硬上限 (2026-04-20 Group Project 规则最新版)
 
     # servo_s2 升降角度 (-90..20 度). 比赛前用 manual_mission_node 校准到实际机械位.
     LIFT_UP_DEG = 20     # 叉臂抬起 (托住货架)
