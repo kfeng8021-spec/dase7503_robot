@@ -83,6 +83,22 @@ def generate_launch_description():
         output="screen",
     )
 
+    # 5b. YOLO Detector (Tutorial 7 加分项, onnxruntime CPU, yolov8n)
+    # 订 /camera/image_raw/compressed, 发 /yolo/detections/compressed
+    # 和 qr_scanner 共用相机图像流, 互不冲突.
+    yolo = Node(
+        package="our_robot",
+        executable="yolo_detector_node",
+        name="yolo_detector",
+        output="log",
+        parameters=[{
+            "confidence_threshold": 0.5,
+            "iou_threshold": 0.45,
+            "show_window": False,
+            "input_size": 640,
+        }],
+    )
+
     # 6. Battery Monitor
     battery = Node(
         package="our_robot",
@@ -144,6 +160,7 @@ def generate_launch_description():
         lidar,
         camera,
         qr_scanner,
+        yolo,
         battery,
         nav2_localization,
         nav2_navigation,
