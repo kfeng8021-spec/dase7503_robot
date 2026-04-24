@@ -16,7 +16,7 @@ slam_toolbox:
     odom_frame: odom
     map_frame: map
     base_frame: base_footprint
-    scan_topic: /scan
+    scan_topic: /scan_lidar
     use_map_saver: true
     mode: mapping  # 建图模式; 赛场定位换成 localization
 

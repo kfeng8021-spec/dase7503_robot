@@ -7,7 +7,7 @@
 """
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -22,18 +22,9 @@ def generate_launch_description():
         "map", default=os.path.expanduser("~/maps/gamefield_map.yaml")
     )
     use_sim_time = LaunchConfiguration("use_sim_time", default="false")
-    # 默认用 udev 绑定的符号链接 /dev/esp32 (见 rpi5_setup/udev/99-robot-devices.rules).
-    # 如 udev 未装, 启动时显式传参: ros2 launch ... esp_dev:=/dev/ttyUSB0
-    esp_dev = LaunchConfiguration("esp_dev", default="/dev/esp32")
 
-    # 1. micro-ROS Agent (ESP32, 波特率 115200 必须跟固件 Serial.begin 一致)
-    agent = ExecuteProcess(
-        cmd=[
-            "ros2", "run", "micro_ros_agent", "micro_ros_agent",
-            "serial", "--dev", esp_dev, "-b", "115200",
-        ],
-        output="screen",
-    )
+    # micro-ROS agent: 由 systemd 启 (factory FW, /dev/ttyUSB0 @ 921600, domain 20).
+    # 原来这里 ExecuteProcess 启 agent 和 systemd 冲串口, 去掉.
 
     # 2. URDF robot_state_publisher (TF 树 base_footprint→base_link→laser→camera)
     urdf_path = PathJoinSubstitution([pkg_share, "urdf", "robot.urdf.xacro"])
@@ -45,14 +36,26 @@ def generate_launch_description():
         output="log",
     )
 
-    # 3. LiDAR (Oradar MS200)
-    lidar = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            PathJoinSubstitution([
-                FindPackageShare("oradar_lidar"),
-                "launch", "ms200_scan.launch.py",
-            ])
-        ])
+    # 3. LiDAR (Oradar MS200, 内联 Node 以覆盖 scan_topic).
+    # 发 /scan_lidar 而非 /scan, 因为 ESP32 factory FW 也发 /scan (空数据).
+    lidar = Node(
+        package="oradar_lidar",
+        executable="oradar_scan",
+        name="MS200",
+        output="screen",
+        parameters=[{
+            "device_model": "MS200",
+            "frame_id": "laser_link",
+            "scan_topic": "scan_lidar",
+            "port_name": "/dev/lidar",
+            "baudrate": 230400,
+            "angle_min": 0.0,
+            "angle_max": 360.0,
+            "range_min": 0.05,
+            "range_max": 20.0,
+            "clockwise": False,
+            "motor_speed": 10,
+        }],
     )
 
     # 4. Camera (IMX708 via camera_ros)
@@ -131,8 +134,6 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("map", default_value=map_file),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
-        DeclareLaunchArgument("esp_dev", default_value="/dev/esp32"),
-        agent,
         robot_state,
         odom_tf,
         lidar,
