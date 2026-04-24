@@ -43,9 +43,8 @@ START_POINT = {"x": 0.30, "y": 0.30, "yaw": 0.0}
 # 先跑起来后按实际时间优化
 DELIVERY_ORDER = ["D", "C", "A", "B"]
 
-# 比赛队伍随机串, 必须跟 scripts/qr_generate.py 生成时一致
-# ⚠️ 队伍选定 4 位 code 后改成真值
-TEAM_CODE = "4X6M"
+# 比赛队伍随机串, 必须跟 scripts/qr_codes/ 的 PNG 内容一致
+TEAM_CODE = "TM10"
 
 
 def rack_qr_content(rack_id: str) -> str:
