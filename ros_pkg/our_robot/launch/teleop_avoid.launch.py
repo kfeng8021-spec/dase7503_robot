@@ -2,9 +2,19 @@
 Teleop + LiDAR 避障 launch.
 
 起这些节点:
-  - micro-ROS Agent (ESP32)
-  - MS200 LiDAR (/scan)
-  - laser_safety_gate (/cmd_vel_raw + /scan -> /cmd_vel)
+  - MS200 LiDAR (oradar_lidar 的 oradar_scan, 发布 /scan_lidar, port=/dev/lidar)
+  - laser_safety_gate (/cmd_vel_raw + /scan_lidar -> /cmd_vel)
+
+依赖前置(这个 launch 不启动):
+  - systemd `micro-ros-agent` 已 running (factory FW, serial @ /dev/ttyUSB0 @ 921600,
+    ROS_DOMAIN_ID=20). 验证: `systemctl is-active micro-ros-agent` → active
+  - LiDAR 通过 USB 接 Pi5 (课程材料: "Lidar will be connected with Raspberry Pi 5"),
+    udev 规则建 /dev/lidar 符号链接 (CH343 VID 1a86:55d4).
+
+为什么 scan 不发 /scan 而发 /scan_lidar:
+  ESP32 factory FW 会持续发布 /scan, 即使板上 LiDAR 口不接, ranges 也是全 0.0.
+  如果 oradar 也发 /scan, 两个 publisher 会让下游读到交替的真假数据 → safety gate
+  永远触发硬停. 所以 oradar 发 /scan_lidar, 下游订 /scan_lidar, 完全避开 ESP32 那一路.
 
 另一个终端跑遥控 (把 teleop 的默认 /cmd_vel 重映射到 /cmd_vel_raw):
   source /opt/ros/jazzy/setup.bash
@@ -13,30 +23,18 @@ Teleop + LiDAR 避障 launch.
     --ros-args -r /cmd_vel:=/cmd_vel_raw
 
 参数:
-  esp_dev         default /dev/esp32 (fallback: /dev/ttyUSB0)
-  lidar_dev       default /dev/lidar (fallback: /dev/ttyUSB1)
   hard_stop_dist  default 0.25 m — 小于此直接停这个方向
   slow_down_dist  default 0.50 m — 介于这两个之间线性缩放
 """
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    esp_dev = LaunchConfiguration("esp_dev")
-    lidar_dev = LaunchConfiguration("lidar_dev")
     hard_stop = LaunchConfiguration("hard_stop_dist")
     slow_down = LaunchConfiguration("slow_down_dist")
-
-    agent = ExecuteProcess(
-        cmd=[
-            "ros2", "run", "micro_ros_agent", "micro_ros_agent",
-            "serial", "--dev", esp_dev, "-b", "115200",
-        ],
-        output="screen",
-    )
 
     lidar = Node(
         package="oradar_lidar",
@@ -46,8 +44,8 @@ def generate_launch_description():
         parameters=[{
             "device_model": "MS200",
             "frame_id": "laser_link",
-            "scan_topic": "scan",
-            "port_name": lidar_dev,
+            "scan_topic": "scan_lidar",
+            "port_name": "/dev/lidar",
             "baudrate": 230400,
             "angle_min": 0.0,
             "angle_max": 360.0,
@@ -66,7 +64,7 @@ def generate_launch_description():
         parameters=[{
             "hard_stop_dist": hard_stop,
             "slow_down_dist": slow_down,
-            "scan_topic": "scan",
+            "scan_topic": "scan_lidar",
             "cmd_in_topic": "cmd_vel_raw",
             "cmd_out_topic": "cmd_vel",
             "watchdog_sec": 0.5,
@@ -74,11 +72,8 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument("esp_dev", default_value="/dev/esp32"),
-        DeclareLaunchArgument("lidar_dev", default_value="/dev/lidar"),
         DeclareLaunchArgument("hard_stop_dist", default_value="0.25"),
         DeclareLaunchArgument("slow_down_dist", default_value="0.50"),
-        agent,
         lidar,
         safety,
     ])
