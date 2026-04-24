@@ -4,7 +4,7 @@ Manual Mission Node - B range 手动模式下也要记 QR 时间戳.
 
 当队员用 teleop_twist_keyboard 手动驾驶机器人时, 这个节点在后台:
   - 监听 /qr_result, 每次确认扫到新 QR 就写到 CSV
-  - 监听键盘命令发布 /lifter_cmd (u=up, d=down)
+  - 监听键盘命令发布 /servo_s2 (u=up 角度 20, d=down 角度 -90, 工厂 FW)
 
 用法:
   ros2 launch our_robot teleop_mode.launch.py
@@ -26,10 +26,13 @@ from rclpy.node import Node
 from std_msgs.msg import Int32, String
 
 
-HELP = """
+LIFT_UP_DEG = 20      # servo_s2 抬起位 (-90..20, 20 = 顶)
+LIFT_DOWN_DEG = -90   # servo_s2 落下位
+
+HELP = f"""
 Manual Mission - QR 时间戳记录 + 升降控制
-  u : 叉臂抬起 (lifter_cmd=1)
-  d : 叉臂放下 (lifter_cmd=0)
+  u : 叉臂抬起 (/servo_s2 = {LIFT_UP_DEG})
+  d : 叉臂放下 (/servo_s2 = {LIFT_DOWN_DEG})
   s : 打印当前日志路径
   q : 退出
 (运动由另一个终端的 teleop_twist_keyboard 控制)
@@ -40,7 +43,7 @@ class ManualMissionNode(Node):
     def __init__(self):
         super().__init__("manual_mission")
         self.qr_sub = self.create_subscription(String, "/qr_result", self._qr_cb, 10)
-        self.lift_pub = self.create_publisher(Int32, "/lifter_cmd", 10)
+        self.lift_pub = self.create_publisher(Int32, "/servo_s2", 10)
 
         log_dir = os.path.expanduser("~/qr_logs")
         os.makedirs(log_dir, exist_ok=True)
@@ -70,11 +73,12 @@ class ManualMissionNode(Node):
         self._log_file.flush()
         self.get_logger().info(f"[LOGGED] {content} @ {now:.3f}")
 
-    def lift(self, cmd: int):
+    def lift(self, angle_deg: int):
         m = Int32()
-        m.data = cmd
+        m.data = int(angle_deg)
         self.lift_pub.publish(m)
-        self.get_logger().info(f"lifter_cmd={cmd} ({'UP' if cmd else 'DOWN'})")
+        label = "UP" if angle_deg > 0 else "DOWN"
+        self.get_logger().info(f"/servo_s2 = {angle_deg} ({label})")
 
     def destroy_node(self):
         try:
@@ -101,9 +105,9 @@ def _key_thread(node: ManualMissionNode):
         except Exception:
             break
         if c == "u":
-            node.lift(1)
+            node.lift(LIFT_UP_DEG)
         elif c == "d":
-            node.lift(0)
+            node.lift(LIFT_DOWN_DEG)
         elif c == "s":
             node.get_logger().info(f"Log path: {node.log_path}")
         elif c in ("q", "\x03"):   # q or Ctrl-C

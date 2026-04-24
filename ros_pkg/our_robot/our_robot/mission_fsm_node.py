@@ -51,14 +51,19 @@ class MissionFSM(Node):
     LIFT_DWELL_SEC = 1.5       # 升降机构伺服到位时间
     SCAN_TIMEOUT_SEC = 10.0    # 扫不到 QR 的超时
     MAX_SCAN_RETRIES = 2       # 单个货架最多重扫次数
+    MISSION_BUDGET_SEC = 8 * 60  # 比赛 8 分钟硬上限 (2026-04-20 规则)
+
+    # servo_s2 升降角度 (-90..20 度). 比赛前用 manual_mission_node 校准到实际机械位.
+    LIFT_UP_DEG = 20     # 叉臂抬起 (托住货架)
+    LIFT_DOWN_DEG = -90  # 叉臂放下 (货架落地)
 
     def __init__(self):
         super().__init__("mission_fsm")
 
-        # ROS interfaces
+        # ROS interfaces. lift 走 /servo_s2 (工厂 FW), 原 /lifter_cmd 是团队 PIO 残留.
         self._nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
         self.qr_sub = self.create_subscription(String, "/qr_result", self._qr_cb, 10)
-        self.lift_pub = self.create_publisher(Int32, "/lifter_cmd", 10)
+        self.lift_pub = self.create_publisher(Int32, "/servo_s2", 10)
 
         # Nav2 ActionServer 预热 (一次性阻塞, 放 init 避免阻塞 timer callback)
         self.get_logger().info("Waiting for navigate_to_pose action server...")
@@ -88,6 +93,9 @@ class MissionFSM(Node):
         self._log_writer.writerow(["workstation", "qr_content", "unix_timestamp", "iso_time"])
         self._log_file.flush()
         self.get_logger().info(f"QR scan log -> {self.log_path}")
+
+        # 比赛全局计时器 (8 分钟) — 在 SCAN_START 扫到 START QR 时开始
+        self.mission_t0 = None
 
         # Main loop @ 10 Hz
         self.timer = self.create_timer(0.1, self._loop)
@@ -140,14 +148,24 @@ class MissionFSM(Node):
             lambda _: setattr(self, "nav_done", True)
         )
 
-    def _lift(self, cmd: int):
-        """0 = down, 1 = up."""
+    def _lift(self, angle_deg: int):
+        """发 /servo_s2 servo 角度 (-90..20). LIFT_UP_DEG = 托起, LIFT_DOWN_DEG = 落下."""
         msg = Int32()
-        msg.data = cmd
+        msg.data = int(angle_deg)
         self.lift_pub.publish(msg)
 
     def _loop(self):
         s = self.state
+
+        # 全局 8 分钟硬上限 — 计时从扫到 START QR 开始
+        if self.mission_t0 is not None and s not in (State.IDLE, State.SCAN_START, State.FINISHED):
+            if time.time() - self.mission_t0 >= self.MISSION_BUDGET_SEC:
+                self.get_logger().error(
+                    f"⏰ MISSION BUDGET 8min EXCEEDED — forcing FINISHED (delivered={len(DELIVERY_ORDER)-len(self.rack_queue)})"
+                )
+                self._log_qr("TIMEOUT", f"remaining={self.rack_queue}")
+                self._enter(State.FINISHED)
+                return
 
         if s is State.IDLE:
             self._enter(State.SCAN_START)
@@ -155,6 +173,8 @@ class MissionFSM(Node):
         elif s is State.SCAN_START:
             if self.qr_recv == "START":
                 self._log_qr("START", "START")
+                self.mission_t0 = time.time()  # 8min 计时开始
+                self.get_logger().info("⏱️ Mission timer started (8 min budget).")
                 self.qr_recv = None
                 self._enter(State.NAV_TO_RACK)
 
@@ -212,7 +232,7 @@ class MissionFSM(Node):
             if not self.nav_done:
                 return
             if not self._lift_cmd_sent:
-                self._lift(1)
+                self._lift(self.LIFT_UP_DEG)
                 self._lift_cmd_sent = True
                 self._lift_t0 = time.time()
                 return
@@ -229,7 +249,7 @@ class MissionFSM(Node):
                 return
             if not self._lift_cmd_sent:
                 self._log_qr("DEST", "END")
-                self._lift(0)
+                self._lift(self.LIFT_DOWN_DEG)
                 self._lift_cmd_sent = True
                 self._lift_t0 = time.time()
                 return

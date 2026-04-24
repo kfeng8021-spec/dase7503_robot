@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Battery Monitor - 订阅 ESP32 发布的 /battery_voltage, 低电压报警.
+Battery Monitor - 订阅 ESP32 工厂 FW 发布的 /battery (UInt16, data÷10 = V), 低电压报警.
+
+原来订的是团队 PIO 的 /battery_voltage (Float32), 工厂 FW 改成 /battery (UInt16, 1 Hz).
 
 7.4V 锂电池安全范围:
   充满: 8.4V
@@ -9,11 +11,10 @@ Battery Monitor - 订阅 ESP32 发布的 /battery_voltage, 低电压报警.
   紧急停机: < 6.4V
 
 报警方式: rclpy logger WARN + ROS 话题 /battery_alert (std_msgs/String).
-想接蜂鸣器的话在 ESP32 固件里加个 buzzer pin 根据 /battery_alert 响.
 """
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32, String
+from std_msgs.msg import String, UInt16
 
 
 class BatteryMonitor(Node):
@@ -24,17 +25,17 @@ class BatteryMonitor(Node):
     def __init__(self):
         super().__init__("battery_monitor")
         self.sub = self.create_subscription(
-            Float32, "/battery_voltage", self._cb, 10
+            UInt16, "/battery", self._cb, 10
         )
         self.pub = self.create_publisher(String, "/battery_alert", 10)
         self.state = "OK"
         self.last_voltage = None
         # 5 秒打印一次电压, 防止日志刷屏
         self.create_timer(5.0, self._periodic_log)
-        self.get_logger().info("Battery monitor started.")
+        self.get_logger().info("Battery monitor started (subs /battery UInt16, V = data/10).")
 
-    def _cb(self, msg: Float32):
-        v = msg.data
+    def _cb(self, msg: UInt16):
+        v = msg.data / 10.0   # 工厂 FW 约定: data÷10 = 实际电压 V
         self.last_voltage = v
 
         # 滞回: 只有低于 WARN 才进入 WARN, 只有高于 OK 才回到 OK
