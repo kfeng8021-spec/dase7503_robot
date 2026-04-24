@@ -2,9 +2,12 @@
 """
 Odom TF Broadcaster.
 
-ESP32 只发 /wheel_odom (nav_msgs/Odometry) 话题, 不发 TF.
-这个节点订阅 /wheel_odom 然后广播 odom -> base_footprint TF.
+Yahboom factory FW 发 /odom_raw (nav_msgs/Odometry), 不发 TF.
+这个节点订阅 /odom_raw 然后广播 odom -> base_footprint TF.
 (Nav2 需要这条 TF 链条, 没它 AMCL 无法定位)
+
+原来订的是 /wheel_odom — 那是团队 PIO 固件的命名, 现在切到工厂 FW 已废弃.
+改订 /odom_raw 与工厂 FW 对齐.
 
 TF 树完整链 (运行后):
   map --(AMCL)--> odom --(本节点)--> base_footprint --(URDF)--> base_link -> laser_link / camera_link
@@ -21,9 +24,9 @@ class OdomTFBroadcaster(Node):
         super().__init__("odom_tf_broadcaster")
         self.br = TransformBroadcaster(self)
         self.sub = self.create_subscription(
-            Odometry, "/wheel_odom", self._cb, 50
+            Odometry, "/odom_raw", self._cb, 50
         )
-        self.get_logger().info("odom -> base_footprint TF broadcaster started.")
+        self.get_logger().info("odom -> base_footprint TF broadcaster started (sub /odom_raw).")
 
     def _cb(self, msg: Odometry):
         t = TransformStamped()

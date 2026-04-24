@@ -12,9 +12,11 @@
 """
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -55,7 +57,11 @@ def generate_launch_description():
     robot_state = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[{"robot_description": Command(["xacro ", urdf_path])}],
+        parameters=[{
+            "robot_description": ParameterValue(
+                Command(["xacro ", urdf_path]), value_type=str
+            )
+        }],
         output="log",
     )
 
@@ -67,13 +73,21 @@ def generate_launch_description():
         output="log",
     )
 
-    # 4. SLAM Toolbox (online async 模式, 边走边建)
-    slam = Node(
-        package="slam_toolbox",
-        executable="async_slam_toolbox_node",
-        name="slam_toolbox",
-        parameters=[slam_params, {"use_sim_time": False}],
-        output="screen",
+    # 4. SLAM Toolbox (online async 模式, 边走边建).
+    # 不手工 Node() — async_slam_toolbox_node 是 lifecycle 节点, 需要外部
+    # configure+activate. 直接用 slam_toolbox 官方 online_async_launch.py,
+    # 它自己处理 lifecycle 转换.
+    slam = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare("slam_toolbox"),
+                "launch", "online_async_launch.py",
+            ])
+        ]),
+        launch_arguments={
+            "slam_params_file": slam_params,
+            "use_sim_time": "false",
+        }.items(),
     )
 
     # 5. Teleop 提示: 单独终端跑 ros2 run teleop_twist_keyboard teleop_twist_keyboard

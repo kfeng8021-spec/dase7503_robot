@@ -18,6 +18,7 @@ slam_toolbox:
     base_frame: base_footprint
     scan_topic: /scan_lidar
     use_map_saver: true
+    use_lifecycle_manager: false  # false → 节点自激活, 不需要外部 lifecycle_manager 或手动 configure+activate
     mode: mapping  # 建图模式; 赛场定位换成 localization
 
     # --- 地图分辨率 ---
