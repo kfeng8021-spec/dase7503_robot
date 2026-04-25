@@ -1,10 +1,13 @@
 # Nav2 参数 (Full Plan D3 + 实车调优)
-# 关键点: Mecanum 全向 -> robot_model_type=OmniMotionModel
+# 关键点: 工厂 FW 不支持 Mecanum 横移 (vy 忽略), 所以按差速车配置.
 #        机器人半径 0.18m (底盘 280mm + 留 20mm)
+# 2026-04-25 改: OmniMotionModel → DifferentialMotionModel
+#   原因: 工厂 FW 是 diff-drive, vy 命令无效, 横移不可达.
+#         AMCL 粒子滤波按差速假设, 精度更高, 收敛更快.
 
 amcl:
   ros__parameters:
-    robot_model_type: nav2_amcl::OmniMotionModel  # Mecanum
+    robot_model_type: nav2_amcl::DifferentialMotionModel  # 差速 (工厂 FW 限制)
     max_particles: 2000
     min_particles: 500
     laser_max_range: 8.0
