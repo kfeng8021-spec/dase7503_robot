@@ -201,7 +201,16 @@ class MissionFSM(Node):
                 return
 
         if s is State.IDLE:
-            self._enter(State.SCAN_START)
+            # 启动时升降机可能在 UP 位置 (上次任务残留 / 测试残留),
+            # 先发 LIFT_DOWN 让叉臂落到 +20 位置, 否则钻 rack 会撞顶板.
+            if not self._lift_cmd_sent:
+                self._lift(self.LIFT_DOWN_DEG)
+                self._lift_cmd_sent = True
+                self._lift_t0 = time.time()
+                self.get_logger().info("🔧 Initial LIFT_DOWN — clearing fork to +20°")
+                return
+            if time.time() - self._lift_t0 >= self.LIFT_DWELL_SEC:
+                self._enter(State.SCAN_START)
 
         elif s is State.SCAN_START:
             if self.qr_recv == "START":

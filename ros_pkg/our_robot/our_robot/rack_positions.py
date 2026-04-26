@@ -19,8 +19,8 @@ FIELD_HEIGHT = 3.020  # y 方向 (mm: 3020)
 # DESTINATION zone:  中心 (1.000, 2.626), 1410×800 mm, 角点 (0.294, 2.224)~(1.706, 3.020)
 
 # 起点 (START): 用户实测 "初始 lift 点 = start_zone 右半中心" = (1200, 298) mm
-# yaw=π/2 朝 +y (朝 destination_zone)
-START_POINT = {"x": 1.200, "y": 0.298, "yaw": 1.5708}
+# yaw=π 朝 -x (用户实测: 小车初始朝场地左边). 旋转 90° 后才面对 destination.
+START_POINT = {"x": 1.200, "y": 0.298, "yaw": 3.14159}
 
 # 目的区 (DESTINATION): destination_zone 中心
 DESTINATION = {"x": 1.000, "y": 2.626, "yaw": 1.5708}
