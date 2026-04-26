@@ -18,6 +18,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     pkg_share = FindPackageShare("our_robot")
     nav2_params = PathJoinSubstitution([pkg_share, "config", "nav2_params.yaml"])
+    ekf_params = PathJoinSubstitution([pkg_share, "config", "ekf.yaml"])
 
     map_file = LaunchConfiguration(
         "map", default=os.path.expanduser("~/maps/gamefield_map.yaml")
@@ -112,11 +113,13 @@ def generate_launch_description():
         output="screen",
     )
 
-    # 6b. Odom TF Broadcaster (补齐 odom -> base_footprint TF, Nav2 必需)
-    odom_tf = Node(
-        package="our_robot",
-        executable="odom_tf_broadcaster",
-        name="odom_tf_broadcaster",
+    # 6b. EKF 融合 wheel odom + IMU → 发 odom→base_footprint TF
+    # (取代 odom_tf_broadcaster, 修 Mecanum 打滑 yaw drift, AMCL 定位也变稳)
+    ekf = Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_filter_node",
+        parameters=[ekf_params],
         output="log",
     )
 
@@ -171,7 +174,7 @@ def generate_launch_description():
         DeclareLaunchArgument("map", default_value=map_file),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
         robot_state,
-        odom_tf,
+        ekf,
         lidar,
         camera,
         qr_scanner,

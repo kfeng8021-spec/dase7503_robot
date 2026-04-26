@@ -1,0 +1,53 @@
+# robot_localization EKF: 融合 wheel odom (/odom_raw) + IMU (/imu)
+# 修 Mecanum 在防水布上打滑导致 odom 漂的问题.
+# 输出: /odometry/filtered + odom → base_footprint TF.
+#
+# Yahboom factory FW differential drive: /odom_raw vx 来自 wheel, vy=0, vyaw 来自 wheel.
+# /imu 25Hz: angular_velocity (gyro) + linear_acceleration. orientation 工厂 FW 不一定可信.
+#
+# 策略: 用 wheel vx (差速车前进速度) + IMU vyaw (修打滑导致 yaw 漂).
+
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.2          # IMU 25Hz, odom 11Hz, 200ms 容忍
+    two_d_mode: true             # 平面机器人, 不用 z/roll/pitch
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: false
+    debug: false
+    publish_tf: true             # ekf 自己发 odom→base_footprint TF, 禁 odom_tf_broadcaster
+    publish_acceleration: false
+    permit_corrected_publication: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom            # 不用 map (那是 SLAM/AMCL 的事)
+
+    # === Wheel odom: 信任 vx + vyaw ===
+    # 字段顺序: [x y z roll pitch yaw vx vy vz vroll vpitch vyaw ax ay az]
+    odom0: /odom_raw
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 10
+    odom0_differential: false
+    odom0_relative: false
+    odom0_nodelay: true
+
+    # === IMU: 信任 gyro_z (vyaw) + linear_accel (ax, ay) ===
+    # ax/ay 修 mecanum 打滑导致 wheel vx 不准
+    imu0: /imu
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  true,  true,  false]
+    imu0_queue_size: 10
+    imu0_differential: false
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true
+    imu0_nodelay: true

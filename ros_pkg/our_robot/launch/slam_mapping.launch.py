@@ -23,6 +23,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     pkg_share = FindPackageShare("our_robot")
     slam_params = PathJoinSubstitution([pkg_share, "config", "slam_toolbox_params.yaml"])
+    ekf_params = PathJoinSubstitution([pkg_share, "config", "ekf.yaml"])
 
     # micro-ROS agent: 由 systemd 启 (factory FW, /dev/ttyUSB0 @ 921600, domain 20).
     # 原来这里 ExecuteProcess 启 agent 和 systemd 冲串口, 去掉.
@@ -65,12 +66,14 @@ def generate_launch_description():
         output="log",
     )
 
-    # 3b. odom -> base_footprint TF (SLAM 也需要)
-    odom_tf = Node(
-        package="our_robot",
-        executable="odom_tf_broadcaster",
-        name="odom_tf_broadcaster",
-        output="log",
+    # 3b. EKF 融合 wheel odom + IMU → 发 odom→base_footprint TF
+    # (取代 odom_tf_broadcaster, 修 Mecanum 打滑 yaw drift)
+    ekf = Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_filter_node",
+        parameters=[ekf_params],
+        output="screen",
     )
 
     # 4. SLAM Toolbox (online async 模式, 边走边建).
@@ -95,7 +98,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         robot_state,
-        odom_tf,
+        ekf,
         lidar,
         slam,
     ])
