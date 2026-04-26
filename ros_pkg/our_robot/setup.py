@@ -26,6 +26,7 @@ setup(
     entry_points={
         "console_scripts": [
             "qr_scanner_node = our_robot.qr_scanner_node:main",
+            "qr_detector_node = our_robot.qr_detector_node:main",
             "mission_fsm_node = our_robot.mission_fsm_node:main",
             "manual_mission_node = our_robot.manual_mission_node:main",
             "battery_monitor_node = our_robot.battery_monitor_node:main",
