@@ -44,9 +44,8 @@ controller_server:
       use_velocity_scaled_lookahead_dist: true
       # 实测 ESP32 factory FW motor 死区: cmd_vel angular.z < 0.5 rad/s 时不响应,
       # linear.x < 0.1 m/s 时也大概率不动. 强制最小速度 + rotate_to_heading 参数:
-      use_rotate_to_heading: true
-      rotate_to_heading_min_angle: 0.30
-      rotate_to_heading_angular_vel: 1.5   # 激进档, 实测 0.8 不够车不动
+      use_rotate_to_heading: false   # Mecanum 在防水布原地转打滑, encoder 报假位移骗 AMCL
+      rotate_to_heading_angular_vel: 1.5
       min_approach_linear_velocity: 0.20   # 接近时最小线速度
       # 禁 regulated scaling: rack inflation 让 cost 高 → linear 被砍 0 → 车不动.
       # 我们要直接走出 desired_linear_vel.
