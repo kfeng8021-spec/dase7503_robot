@@ -85,24 +85,33 @@ planner_server:
       use_astar: true  # A* 比 Dijkstra 更适合稀疏场地
       allow_unknown: false
 
-# Nav2 jazzy 默认会启 collision_monitor 节点, 缺 observation_sources 会 fail.
-# 给最小配置: 用同一 /scan_lidar, 空 polygons (不做 polygon-based stop, controller
-# 自己的 inflation_layer 已经够). cmd_vel chain: smoothed → collision_monitor → out.
+# 复制 nav2_bringup 默认 collision_monitor 配置, 仅改 scan topic = /scan_lidar.
+# (空 polygons 会 SIGABRT — 必须给至少一个 polygon)
 collision_monitor:
   ros__parameters:
     base_frame_id: "base_footprint"
     odom_frame_id: "odom"
     cmd_vel_in_topic: "cmd_vel_smoothed"
     cmd_vel_out_topic: "cmd_vel"
-    transform_tolerance: 0.5
-    source_timeout: 5.0
+    state_topic: "collision_monitor_state"
+    transform_tolerance: 0.2
+    source_timeout: 1.0
     base_shift_correction: True
     stop_pub_timeout: 2.0
-    polygons: []
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"
+      time_before_collision: 1.2
+      simulation_time_step: 0.1
+      min_points: 6
+      visualize: False
+      enabled: True
     observation_sources: ["scan"]
     scan:
       type: "scan"
-      topic: "/scan_lidar"
+      topic: "/scan_lidar"  # 跟 amcl/costmap 一致, 避开 ESP32 空 /scan
       min_height: 0.05
       max_height: 0.30
       enabled: True
