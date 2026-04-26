@@ -63,10 +63,21 @@ class MissionFSM(Node):
     def __init__(self):
         super().__init__("mission_fsm")
 
-        # 状态变量必须在 create_subscription 之前 init — 否则 _qr_cb 收到第一条消息时
-        # _qr_seen 等还不存在 (我们 init 里有 spin_once 等 AMCL discovery, 期间 callback 会跑).
+        # 状态变量 + log file 必须在 create_subscription 之前 init — 否则 _qr_cb 收到
+        # 第一条消息时 _qr_seen / _log_writer 还不存在 (init 里有 spin_once 等 AMCL discovery,
+        # 期间 callback 会跑).
         self.qr_recv = None
         self._qr_seen = set()
+
+        # QR timestamp log (移到 init 早期, _qr_cb 调 _log_qr 需要 _log_writer)
+        log_dir = os.path.expanduser("~/qr_logs")
+        os.makedirs(log_dir, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        self.log_path = os.path.join(log_dir, f"qr_scan_log_{stamp}.csv")
+        self._log_file = open(self.log_path, "w", newline="")
+        self._log_writer = csv.writer(self._log_file)
+        self._log_writer.writerow(["workstation", "qr_content", "unix_timestamp", "iso_time"])
+        self._log_file.flush()
 
         # ROS interfaces. lift 走 /servo_s2 (工厂 FW), 原 /lifter_cmd 是团队 PIO 残留.
         self._nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
@@ -112,15 +123,7 @@ class MissionFSM(Node):
         self._lift_t0 = 0.0               # 发 lift 后开始计时
         self._scan_retries = 0            # 当前货架扫描已重试次数
 
-        # QR timestamp log (新版要求)
-        log_dir = os.path.expanduser("~/qr_logs")
-        os.makedirs(log_dir, exist_ok=True)
-        stamp = time.strftime("%Y%m%d_%H%M%S")
-        self.log_path = os.path.join(log_dir, f"qr_scan_log_{stamp}.csv")
-        self._log_file = open(self.log_path, "w", newline="")
-        self._log_writer = csv.writer(self._log_file)
-        self._log_writer.writerow(["workstation", "qr_content", "unix_timestamp", "iso_time"])
-        self._log_file.flush()
+        # QR log file 已在 init 早期创建 (移到 sub 之前避免 _qr_cb 取不到 _log_writer)
         self.get_logger().info(f"QR scan log -> {self.log_path}")
 
         # 比赛全局计时器 (8 分钟) — 在 SCAN_START 扫到 START QR 时开始
