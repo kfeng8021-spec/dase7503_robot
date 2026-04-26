@@ -50,7 +50,7 @@ local_costmap:
           obstacle_max_range: 2.5
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.15
+        inflation_radius: 0.20  # ≥ 0.186 inscribed (机器人半径), 否则 controller 报警
 
 global_costmap:
   global_costmap:
@@ -84,3 +84,25 @@ planner_server:
       plugin: "nav2_navfn_planner::NavfnPlanner"
       use_astar: true  # A* 比 Dijkstra 更适合稀疏场地
       allow_unknown: false
+
+# Nav2 jazzy 默认会启 collision_monitor 节点, 缺 observation_sources 会 fail.
+# 给最小配置: 用同一 /scan_lidar, 空 polygons (不做 polygon-based stop, controller
+# 自己的 inflation_layer 已经够). cmd_vel chain: smoothed → collision_monitor → out.
+collision_monitor:
+  ros__parameters:
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_out_topic: "cmd_vel"
+    transform_tolerance: 0.5
+    source_timeout: 5.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: []
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "/scan_lidar"
+      min_height: 0.05
+      max_height: 0.30
+      enabled: True
