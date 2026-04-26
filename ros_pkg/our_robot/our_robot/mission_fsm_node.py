@@ -62,6 +62,11 @@ class MissionFSM(Node):
     def __init__(self):
         super().__init__("mission_fsm")
 
+        # 状态变量必须在 create_subscription 之前 init — 否则 _qr_cb 收到第一条消息时
+        # _qr_seen 等还不存在 (我们 init 里有 spin_once 等 AMCL discovery, 期间 callback 会跑).
+        self.qr_recv = None
+        self._qr_seen = set()
+
         # ROS interfaces. lift 走 /servo_s2 (工厂 FW), 原 /lifter_cmd 是团队 PIO 残留.
         self._nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
         self.qr_sub = self.create_subscription(String, "/qr_result", self._qr_cb, 10)
@@ -89,17 +94,15 @@ class MissionFSM(Node):
         else:
             self.get_logger().info("Nav2 action server ready.")
 
-        # FSM state
+        # FSM state (qr_recv / _qr_seen 已在 init 早期 set)
         self.state = State.IDLE
         self.state_t0 = time.time()       # 进入当前状态的时间 (用于非阻塞计时)
         self.rack_queue = list(DELIVERY_ORDER)
         self.current_rack = None
-        self.qr_recv = None
         self.nav_done = False
         self._lift_cmd_sent = False       # 保证 lift 命令只发一次
         self._lift_t0 = 0.0               # 发 lift 后开始计时
         self._scan_retries = 0            # 当前货架扫描已重试次数
-        self._qr_seen = set()             # _qr_cb 路上 QR log 5s 窗口去重 (跟 manual_mission_node 一致)
 
         # QR timestamp log (新版要求)
         log_dir = os.path.expanduser("~/qr_logs")
