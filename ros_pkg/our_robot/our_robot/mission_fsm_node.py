@@ -254,14 +254,17 @@ class MissionFSM(Node):
         elif s is State.SCAN_RACK:
             if not self.nav_done:
                 return
-            expected = rack_qr_content(self.current_rack)
-            if self.qr_recv and self.qr_recv == expected:
+            # Wildcard match: 接受 "RACK<id>_*" 任意后缀, 不绑定 TEAM_CODE.
+            # 因为 0420 spec 没说 XXXX 是组委会给还是我们自己定, 实测场地有 RACKB_AM9L
+            # (非我们 TM10), 严格匹配会 SKIP 所有 rack. wildcard 同时支持两种.
+            expected_prefix = f"RACK{self.current_rack}_"
+            if self.qr_recv and self.qr_recv.startswith(expected_prefix):
                 self._log_qr(f"RACK_{self.current_rack}", self.qr_recv)
                 self.qr_recv = None
                 self._enter(State.APPROACH_RACK)
                 return
             if self.qr_recv:
-                # QR 读到但不是期望的, 清除继续等
+                # QR 读到但不是期望的 rack id (扫到了别的 RACK 或 START), 清除继续等
                 self.qr_recv = None
             # 超时回退: 后退重试或跳过这个货架
             if self._in_state_for() >= self.SCAN_TIMEOUT_SEC:
