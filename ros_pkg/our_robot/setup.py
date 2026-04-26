@@ -33,6 +33,7 @@ setup(
             "odom_tf_broadcaster = our_robot.odom_tf_broadcaster:main",
             "yolo_detector_node = our_robot.yolo_detector_node:main",
             "laser_safety_node = our_robot.laser_safety_node:main",
+            "cmd_vel_relay_node = our_robot.cmd_vel_relay_node:main",
         ],
     },
 )

@@ -149,6 +149,16 @@ def generate_launch_description():
         }.items(),
     )
 
+    # 8b. cmd_vel relay: /cmd_vel_nav → /cmd_vel (绕过 velocity_smoother + collision_monitor)
+    # nav2 default chain controller→smoother→collision→/cmd_vel 实测卡死,
+    # 直接 controller→/cmd_vel 让 ESP32 收到驱动信号.
+    cmd_vel_relay = Node(
+        package="our_robot",
+        executable="cmd_vel_relay_node",
+        name="cmd_vel_relay",
+        output="screen",
+    )
+
     # 9. Mission FSM
     mission_fsm = Node(
         package="our_robot",
@@ -169,5 +179,6 @@ def generate_launch_description():
         battery,
         nav2_localization,
         nav2_navigation,
+        cmd_vel_relay,
         mission_fsm,
     ])
