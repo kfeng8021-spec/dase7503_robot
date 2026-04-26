@@ -22,27 +22,30 @@ slam_toolbox:
     mode: mapping  # 建图模式; 赛场定位换成 localization
 
     # --- 地图分辨率 ---
-    resolution: 0.02       # 2cm/像素, 够用
+    resolution: 0.025      # 2.5cm/像素 (用户建议)
     map_update_interval: 2.0
     max_laser_range: 8.0   # MS200 有效 8m
     minimum_time_interval: 0.2
     transform_publish_period: 0.05
+    transform_timeout: 0.2
     map_file_name: ""      # 建图时置空
 
-    # --- Scan match ---
+    # --- Scan match (帧间收紧, 0.1 m / 0.1 rad 触发 keyframe) ---
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.3  # 0.1→0.3 减少抖动 keyframe (Mecanum 打滑 odom 噪声大)
-    minimum_travel_heading: 0.3   # 0.15→0.3 (~17°) 同上
+    minimum_travel_distance: 0.1
+    minimum_travel_heading: 0.1
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
+    link_match_minimum_response_fine: 0.1   # 降阈值, 更容易匹配
+    link_scan_maximum_distance: 1.5
 
-    # --- Loop closure (场地小+特征少, 调激进) ---
+    # --- Loop closure (小场地激进配置) ---
     do_loop_closing: true
-    loop_search_maximum_distance: 2.0  # 3.0→2.0, 场地 3×2m 范围小
-    loop_match_minimum_chain_size: 6   # 10→6 更激进
+    loop_search_maximum_distance: 3.0
+    loop_match_minimum_chain_size: 5   # 默认 10, 小场地降到 5
     loop_match_maximum_variance_coarse: 3.0
-    loop_match_minimum_response_coarse: 0.3   # 0.35→0.3 容忍特征少环境
+    loop_match_minimum_response_coarse: 0.35
     loop_match_minimum_response_fine: 0.45
 
     # --- Correlation ---
