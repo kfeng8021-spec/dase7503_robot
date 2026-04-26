@@ -43,7 +43,7 @@ RACK_SIZE_Y = 0.144
 
 # 搬运顺序 — 比赛前按实际跑速优化.
 # 当前 [D,C,A,B] 是初始猜测, 跟 mission_fsm_node 内的常量保持一致.
-DELIVERY_ORDER = ["D", "C", "A", "B"]
+DELIVERY_ORDER = ["A", "C", "B", "D"]
 
 # 比赛队伍随机串, 必须跟 scripts/qr_codes/ 的 PNG 内容一致
 TEAM_CODE = "TM10"
