@@ -19,6 +19,21 @@ amcl:
 controller_server:
   ros__parameters:
     controller_frequency: 20.0
+    # 默认 progress_checker 要求 10s 内移动 0.5m, 实测我们的车 mecanum + 死区
+    # 跑不到这速度. 放宽: 20s 移动 0.05m. 同时 goal_checker xy_goal_tolerance 0.25
+    # (默认 0.25), yaw_goal_tolerance 0.25 (默认 0.25), 这俩 default OK.
+    progress_checker_plugins: ["progress_checker"]
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.05
+      movement_time_allowance: 20.0
+    goal_checker_plugins: ["goal_checker"]
+    goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.5
+      stateful: True
+    controller_plugins: ["FollowPath"]
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
       desired_linear_vel: 0.30  # 0.3 m/s 初始, 稳定后可提到 0.4-0.5
