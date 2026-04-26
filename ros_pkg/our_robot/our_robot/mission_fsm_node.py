@@ -45,6 +45,7 @@ class State(Enum):
     LIFT_DOWN = auto()
     WAIT_STABLE = auto()
     CHECK_DONE = auto()
+    SCAN_END = auto()    # 4 个 rack 搬完后, 在 destination 扫 END QR
     FINISHED = auto()
 
 
@@ -87,6 +88,7 @@ class MissionFSM(Node):
         self._lift_cmd_sent = False       # 保证 lift 命令只发一次
         self._lift_t0 = 0.0               # 发 lift 后开始计时
         self._scan_retries = 0            # 当前货架扫描已重试次数
+        self._qr_seen = set()             # _qr_cb 路上 QR log 5s 窗口去重 (跟 manual_mission_node 一致)
 
         # QR timestamp log (新版要求)
         log_dir = os.path.expanduser("~/qr_logs")
@@ -117,6 +119,13 @@ class MissionFSM(Node):
 
     def _qr_cb(self, msg):
         self.qr_recv = msg.data
+        # 路上扫到任何 QR 都立即写 CSV (5s 窗口去重, 跟 manual_mission_node 一致),
+        # 满足比赛 "扫到的 QR 必须记时间戳" 要求. 状态机另外的 _log_qr 调用会
+        # 加 workstation 上下文 (START/RACK_X/END), 跟 DETECT 行可共存.
+        key = (msg.data, int(time.time() / 5))
+        if key not in self._qr_seen:
+            self._qr_seen.add(key)
+            self._log_qr("DETECT", msg.data)
 
     def _log_qr(self, workstation: str, qr_content: str):
         """记录工位扫描时间戳到 CSV."""
@@ -276,7 +285,8 @@ class MissionFSM(Node):
             if not self.nav_done:
                 return
             if not self._lift_cmd_sent:
-                self._log_qr("DEST", "END")
+                # 删假 END log: 真扫 END 在 SCAN_END 状态. _qr_cb 路上扫到 END
+                # 时也会自动 log (DETECT, END).
                 self._lift(self.LIFT_DOWN_DEG)
                 self._lift_cmd_sent = True
                 self._lift_t0 = time.time()
@@ -293,7 +303,28 @@ class MissionFSM(Node):
             if not self.nav_done:
                 return
             self.rack_queue.pop(0)
-            self._enter(State.NAV_TO_RACK if self.rack_queue else State.FINISHED)
+            if self.rack_queue:
+                self._enter(State.NAV_TO_RACK)
+            else:
+                # 4 个 rack 都搬完, 去 destination 扫 END QR (0420 spec 要求)
+                self.qr_recv = None
+                self._enter(State.SCAN_END)
+
+        elif s is State.SCAN_END:
+            # 已经在 destination 区域 (CHECK_DONE 是 WAIT_STABLE 后退的位置)
+            # 等 END QR. _qr_cb 路上扫到也会 auto-log, 这里的 log 是状态机事件.
+            if self.qr_recv == "END":
+                self._log_qr("END", "END")
+                self.qr_recv = None
+                self._enter(State.FINISHED)
+                return
+            # 10s 没扫到 END 强制 finish + warn (mission 不能卡死)
+            if self._in_state_for() >= self.SCAN_TIMEOUT_SEC:
+                self.get_logger().warn(
+                    "SCAN_END timeout — END QR not detected, forcing FINISHED"
+                )
+                self._log_qr("END", "TIMEOUT_NO_QR")
+                self._enter(State.FINISHED)
 
         elif s is State.FINISHED:
             self.get_logger().info(
