@@ -1,0 +1,6 @@
+[submodule "third_party/libcamera"]
+	path = third_party/libcamera
+	url = https://github.com/raspberrypi/libcamera.git
+[submodule "third_party/camera_ros"]
+	path = third_party/camera_ros
+	url = https://github.com/christianrauch/camera_ros.git
