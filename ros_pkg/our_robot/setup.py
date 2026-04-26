@@ -34,6 +34,7 @@ setup(
             "yolo_detector_node = our_robot.yolo_detector_node:main",
             "laser_safety_node = our_robot.laser_safety_node:main",
             "cmd_vel_relay_node = our_robot.cmd_vel_relay_node:main",
+            "qos_bridge_node = our_robot.qos_bridge_node:main",
         ],
     },
 )

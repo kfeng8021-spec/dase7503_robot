@@ -96,8 +96,16 @@ def generate_launch_description():
     # 5. Teleop 提示: 单独终端跑 ros2 run teleop_twist_keyboard teleop_twist_keyboard
     # 这里不拉起 (终端抢焦点)
 
+    qos_bridge = Node(
+        package="our_robot",
+        executable="qos_bridge_node",
+        name="qos_bridge",
+        output="log",
+    )
+
     return LaunchDescription([
         robot_state,
+        qos_bridge,
         ekf,
         lidar,
         slam,

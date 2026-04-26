@@ -113,8 +113,15 @@ def generate_launch_description():
         output="screen",
     )
 
+    # 6a. QoS bridge: ESP32 BE publish → RELIABLE for EKF
+    qos_bridge = Node(
+        package="our_robot",
+        executable="qos_bridge_node",
+        name="qos_bridge",
+        output="log",
+    )
+
     # 6b. EKF 融合 wheel odom + IMU → 发 odom→base_footprint TF
-    # (取代 odom_tf_broadcaster, 修 Mecanum 打滑 yaw drift, AMCL 定位也变稳)
     ekf = Node(
         package="robot_localization",
         executable="ekf_node",
@@ -174,6 +181,7 @@ def generate_launch_description():
         DeclareLaunchArgument("map", default_value=map_file),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
         robot_state,
+        qos_bridge,
         ekf,
         lidar,
         camera,

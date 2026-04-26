@@ -27,7 +27,7 @@ ekf_filter_node:
 
     # === Wheel odom: 信任 vx + vyaw ===
     # 字段顺序: [x y z roll pitch yaw vx vy vz vroll vpitch vyaw ax ay az]
-    odom0: /odom_raw
+    odom0: /odom_raw_rel    # qos_bridge_node 把 BE → RELIABLE 转发, EKF 默认 RELIABLE 订阅
     odom0_config: [false, false, false,
                    false, false, false,
                    true,  false, false,
@@ -40,7 +40,7 @@ ekf_filter_node:
 
     # === IMU: 信任 gyro_z (vyaw) + linear_accel (ax, ay) ===
     # ax/ay 修 mecanum 打滑导致 wheel vx 不准
-    imu0: /imu
+    imu0: /imu_rel    # qos_bridge_node BE → RELIABLE
     imu0_config: [false, false, false,
                   false, false, false,
                   false, false, false,
