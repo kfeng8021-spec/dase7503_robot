@@ -20,6 +20,7 @@ from enum import Enum, auto
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from nav2_msgs.action import NavigateToPose
@@ -74,16 +75,17 @@ class MissionFSM(Node):
         # AMCL 初始位姿注入. 必须在 wait_for_server 之前 publish — 否则:
         #   controller_server.activate() 等 map frame → map frame 来自 AMCL → AMCL 等 /initialpose
         #   → mission_fsm wait_for_server (60s) 内 controller_server 超时 abort
-        # 所以 init 一启动就 publish, 不等扫到 START QR.
-        self.init_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
+        # 用 transient_local QoS (latched) 让 message 持久化, AMCL 后启动也能拿到.
+        latched_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.init_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", latched_qos)
         self._init_pose_sent = False
 
-        # spin_once 让 publisher 跟 AMCL discovery 一下, 再 publish (确保不丢)
-        self.get_logger().info("Publishing initial pose to AMCL (pre-Nav2-activate)...")
-        for _ in range(20):
-            rclpy.spin_once(self, timeout_sec=0.1)
-            if self.init_pose_pub.get_subscription_count() > 0:
-                break
+        # 立即 publish (latched, 不需要等订阅者 — 后启动的 AMCL 也能拿到 last message)
+        self.get_logger().info("Publishing initial pose to AMCL (latched, transient_local)...")
         self._publish_initial_pose()
         self._init_pose_sent = True
 
