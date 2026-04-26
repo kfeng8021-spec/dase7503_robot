@@ -94,8 +94,8 @@ collision_monitor:
     cmd_vel_in_topic: "cmd_vel_smoothed"
     cmd_vel_out_topic: "cmd_vel"
     state_topic: "collision_monitor_state"
-    transform_tolerance: 0.2
-    source_timeout: 1.0
+    transform_tolerance: 1.0    # 实测 hardware odom 11Hz, default 0.2 太严
+    source_timeout: 5.0         # 默认 1.0 太严, 调宽避免误 stop
     base_shift_correction: True
     stop_pub_timeout: 2.0
     polygons: ["FootprintApproach"]
