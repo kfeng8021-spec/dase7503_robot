@@ -169,6 +169,18 @@ def generate_launch_description():
         output="screen",
     )
 
+    # 8c. nav2 bootstrap: 发 /initialpose + 调 lifecycle_manager_navigation
+    # manage_nodes(STARTUP) 重新激活 navigation 链.
+    # 修 P0a/P0b 根因: AMCL 没收 initialpose → controller_server configure 超时
+    # → lifecycle_manager_navigation 卡 inactive → costmap 不发 → controller 不动.
+    # 实测 2026-04-27 凌晨, 见 nav2_bootstrap_node.py docstring.
+    nav2_bootstrap = Node(
+        package="our_robot",
+        executable="nav2_bootstrap_node",
+        name="nav2_bootstrap",
+        output="screen",
+    )
+
     # 9. Mission FSM
     mission_fsm = Node(
         package="our_robot",
@@ -191,5 +203,6 @@ def generate_launch_description():
         nav2_localization,
         nav2_navigation,
         cmd_vel_relay,
+        nav2_bootstrap,
         mission_fsm,
     ])

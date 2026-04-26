@@ -35,6 +35,7 @@ setup(
             "laser_safety_node = our_robot.laser_safety_node:main",
             "cmd_vel_relay_node = our_robot.cmd_vel_relay_node:main",
             "qos_bridge_node = our_robot.qos_bridge_node:main",
+            "nav2_bootstrap_node = our_robot.nav2_bootstrap_node:main",
         ],
     },
 )
