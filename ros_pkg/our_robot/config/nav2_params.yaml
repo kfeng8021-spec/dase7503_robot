@@ -27,6 +27,12 @@ controller_server:
       max_lookahead_dist: 0.6
       transform_tolerance: 0.1
       use_velocity_scaled_lookahead_dist: true
+      # 实测 ESP32 factory FW motor 死区: cmd_vel angular.z < 0.5 rad/s 时不响应,
+      # linear.x < 0.1 m/s 时也大概率不动. 强制最小速度 + rotate_to_heading 参数:
+      use_rotate_to_heading: true
+      rotate_to_heading_min_angle: 0.30
+      rotate_to_heading_angular_vel: 0.6   # ≥ ESP32 motor 死区
+      min_approach_linear_velocity: 0.10   # 接近时最小线速度
 
 local_costmap:
   local_costmap:
