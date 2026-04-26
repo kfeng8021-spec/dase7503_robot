@@ -32,8 +32,8 @@ slam_toolbox:
     # --- Scan match ---
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.0  # 改 0 让原地 / 悬空测试也能产出 map (部署时按需调回 0.2)
-    minimum_travel_heading: 0.0
+    minimum_travel_distance: 0.1  # 实车建图: 0.1m 触发 keyframe (太小累积误差, 太大覆盖不密)
+    minimum_travel_heading: 0.15  # 8.6° 触发, 转弯时也补 keyframe
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
 

@@ -54,8 +54,8 @@ class MissionFSM(Node):
     MISSION_BUDGET_SEC = 3 * 60  # 比赛 3 分钟硬上限 (2026-04-20 Group Project 规则最新版)
 
     # servo_s2 升降角度 (-90..20 度). 比赛前用 manual_mission_node 校准到实际机械位.
-    LIFT_UP_DEG = 20     # 叉臂抬起 (托住货架)
-    LIFT_DOWN_DEG = -90  # 叉臂放下 (货架落地)
+    LIFT_UP_DEG = -90    # 叉臂抬起 (托住货架, 实测: -90 → 升)
+    LIFT_DOWN_DEG = 20   # 叉臂放下 (货架落地, 实测: +20 → 降, 钻 rack 用此位)
 
     def __init__(self):
         super().__init__("mission_fsm")

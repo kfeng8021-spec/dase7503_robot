@@ -26,8 +26,8 @@ from rclpy.node import Node
 from std_msgs.msg import Int32, String
 
 
-LIFT_UP_DEG = 20      # servo_s2 抬起位 (-90..20, 20 = 顶)
-LIFT_DOWN_DEG = -90   # servo_s2 落下位
+LIFT_UP_DEG = -90     # servo_s2 抬起位 (实测: -90 → 叉臂上升)
+LIFT_DOWN_DEG = 20    # servo_s2 落下位 (实测: +20 → 叉臂下降, 钻 rack 用此位)
 
 HELP = f"""
 Manual Mission - QR 时间戳记录 + 升降控制

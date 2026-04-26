@@ -29,19 +29,17 @@ except ImportError:
     sys.exit(1)
 
 
-# ---- 课程 CAD 尺寸 (全部 mm) ----
+# ---- 课程 CAD 尺寸 (全部 mm), 以 0420 spec QR Code and Gamefield.pdf p.2 为准 ----
 FIELD_W_MM = 3020                     # 长边 (沿 +x)
 FIELD_H_MM = 2000                     # 短边 (沿 +y)
 
-# 左侧墙体突入的矩形 (从场地 x=0 向内伸)
-LEFT_CUTOUT_W_MM = 800                # 向内宽度
-LEFT_CUTOUT_H_MM = 1400               # 纵向高度
-LEFT_CUTOUT_Y0_MM = 300               # 距场地底边的间距
+# Rack 是桥拱形门框 (140mm 开口宽), 机器人 (≤30×30×18cm) 钻到 rack 底下,
+# 叉臂顶起 rack 顶板 → 带着 rack 移动. 因此 rack **不**画为 occupied
+# (画了机器人就到不了 rack 中心). LiDAR 13cm 高度只能看到立柱稀疏反射,
+# 由 local_costmap 实时处理, 不进静态地图.
 
-# 右侧墙体突入的矩形 (从 x=FIELD_W 向内伸)
-RIGHT_CUTOUT_W_MM = 600
-RIGHT_CUTOUT_H_MM = 800
-RIGHT_CUTOUT_Y0_MM = 600
+# destination_zone (1400x800) + start_zone (600x800) 是地面 marked 区域 (绿/蓝垫),
+# 不是物理墙, 机器人可以自由穿越 → 静态地图里不画.
 
 BORDER_MM = 200                       # 图像外加一圈缓冲 (标记为 occupied), 防 Nav2 costmap 边界溢出
 
@@ -71,14 +69,7 @@ def generate(resolution_m: float, out_dir: str):
         img_row1 = border_px + mm_to_px(FIELD_H_MM - y0_mm)  # 下边
         return img_row0, img_row1
 
-    # 左侧墙体 (突入的矩形) — occupied
-    lc_rows = world_to_img_rows(LEFT_CUTOUT_Y0_MM, LEFT_CUTOUT_Y0_MM + LEFT_CUTOUT_H_MM)
-    img[lc_rows[0]:lc_rows[1], border_px:border_px + mm_to_px(LEFT_CUTOUT_W_MM)] = 0
-
-    # 右侧墙体 — occupied
-    rc_rows = world_to_img_rows(RIGHT_CUTOUT_Y0_MM, RIGHT_CUTOUT_Y0_MM + RIGHT_CUTOUT_H_MM)
-    img[rc_rows[0]:rc_rows[1],
-        border_px + mm_to_px(FIELD_W_MM - RIGHT_CUTOUT_W_MM):border_px + mm_to_px(FIELD_W_MM)] = 0
+    # racks 不画 (机器人要开进去抬, 不能当 occupied)
 
     os.makedirs(out_dir, exist_ok=True)
     pgm_path = os.path.join(out_dir, "gamefield_map.pgm")
@@ -111,6 +102,7 @@ def generate(resolution_m: float, out_dir: str):
     print(f"  border:  {BORDER_MM} mm = {border_px} px")
     print(f"  origin:  ({origin_x_m}, {origin_y_m}) m = 图像左下角对应的世界坐标")
     print(f"  world:   (0,0) = 场地左下, +x → 长边 {FIELD_W_MM/1000}m, +y → 短边 {FIELD_H_MM/1000}m")
+    print(f"  racks:   不画 (机器人要钻到 rack 底下托起, 不是绕行的障碍物)")
 
 
 def main():
