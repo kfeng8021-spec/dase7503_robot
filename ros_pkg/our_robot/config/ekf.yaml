@@ -9,7 +9,7 @@
 
 ekf_filter_node:
   ros__parameters:
-    frequency: 30.0
+    frequency: 15.0              # 30Hz Pi5 CPU 跑不到 (warn 0.24s/cycle), 降到 15
     sensor_timeout: 0.2          # IMU 25Hz, odom 11Hz, 200ms 容忍
     two_d_mode: true             # 平面机器人, 不用 z/roll/pitch
     transform_time_offset: 0.0
