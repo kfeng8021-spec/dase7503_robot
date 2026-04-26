@@ -64,15 +64,19 @@ def generate_launch_description():
     )
 
     # 4. Camera (IMX708 via camera_ros)
-    # camera_ros 启用 image_transport, 自动发布:
-    #   /camera/image_raw (Image)
-    #   /camera/image_raw/compressed (CompressedImage)   <- qr_scanner / yolo 订阅这个
+    # camera_ros 默认 publish 到 /camera_node/image_raw (node name 当 namespace).
+    # qr_detector / yolo 订阅 /camera/image_raw, 必须 explicit remap.
     camera = Node(
         package="camera_ros",
         executable="camera_node",
         name="camera_node",
         output="log",
         parameters=[{"width": 640, "height": 480, "frame_rate": 30.0}],
+        remappings=[
+            ("/camera_node/image_raw", "/camera/image_raw"),
+            ("/camera_node/image_raw/compressed", "/camera/image_raw/compressed"),
+            ("/camera_node/camera_info", "/camera/camera_info"),
+        ],
     )
 
     # 5. QR Detector (Group10 实测能用版本, 订阅 /camera/image_raw, 5s 去重)
