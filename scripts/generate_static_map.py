@@ -7,10 +7,10 @@ Generate a static Nav2 occupancy map from the official CAD drawing in
   maps/gamefield_map.pgm   Nav2 OccupancyGrid (P5 灰度, 0=占用 255=空闲)
   maps/gamefield_map.yaml  配套 map_server YAML
 
-坐标约定 (和 CAD 一致):
+坐标约定 (按 0420 CAD 直觉视图, x 横 y 纵):
   世界 (0, 0, 0) = 场地**左下角**
-  +x → 沿场地长边 (0 → 3020 mm)
-  +y → 沿场地短边 (0 → 2000 mm)
+  +x → 沿场地短边 / 水平 (0 → 2000 mm)
+  +y → 沿场地长边 / 垂直 (0 → 3020 mm)
 
 用法:
   python3 scripts/generate_static_map.py
@@ -30,8 +30,8 @@ except ImportError:
 
 
 # ---- 课程 CAD 尺寸 (全部 mm), 以 0420 spec QR Code and Gamefield.pdf p.2 为准 ----
-FIELD_W_MM = 3020                     # 长边 (沿 +x)
-FIELD_H_MM = 2000                     # 短边 (沿 +y)
+FIELD_W_MM = 2000                     # 短边 / 沿 +x (图像 width, 水平)
+FIELD_H_MM = 3020                     # 长边 / 沿 +y (图像 height, 垂直)
 
 # Rack 是桥拱形门框 (140mm 开口宽), 机器人 (≤30×30×18cm) 钻到 rack 底下,
 # 叉臂顶起 rack 顶板 → 带着 rack 移动. 因此 rack **不**画为 occupied
@@ -101,7 +101,7 @@ def generate(resolution_m: float, out_dir: str):
     print(f"  field:   {FIELD_W_MM}x{FIELD_H_MM} mm = {field_w_px}x{field_h_px} px")
     print(f"  border:  {BORDER_MM} mm = {border_px} px")
     print(f"  origin:  ({origin_x_m}, {origin_y_m}) m = 图像左下角对应的世界坐标")
-    print(f"  world:   (0,0) = 场地左下, +x → 长边 {FIELD_W_MM/1000}m, +y → 短边 {FIELD_H_MM/1000}m")
+    print(f"  world:   (0,0) = 场地左下, +x → 短边 {FIELD_W_MM/1000}m (水平), +y → 长边 {FIELD_H_MM/1000}m (垂直)")
     print(f"  racks:   不画 (机器人要钻到 rack 底下托起, 不是绕行的障碍物)")
 
 
