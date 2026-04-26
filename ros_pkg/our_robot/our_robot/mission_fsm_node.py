@@ -75,18 +75,24 @@ class MissionFSM(Node):
         # AMCL 初始位姿注入. 必须在 wait_for_server 之前 publish — 否则:
         #   controller_server.activate() 等 map frame → map frame 来自 AMCL → AMCL 等 /initialpose
         #   → mission_fsm wait_for_server (60s) 内 controller_server 超时 abort
-        # 用 transient_local QoS (latched) 让 message 持久化, AMCL 后启动也能拿到.
-        latched_qos = QoSProfile(
-            depth=1,
-            reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        # AMCL 的 /initialpose subscriber QoS = BEST_EFFORT + VOLATILE, 必须用兼容 publisher.
+        # 不能 latched (transient_local) — 实测 RELIABLE+TL pub 跟 BE+VOLATILE sub 不兼容
+        # (rmw_cyclonedds jazzy). 用兼容 default + 多次 retry 让 AMCL 拿到.
+        amcl_qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
         )
-        self.init_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", latched_qos)
+        self.init_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", amcl_qos)
         self._init_pose_sent = False
 
-        # 立即 publish (latched, 不需要等订阅者 — 后启动的 AMCL 也能拿到 last message)
-        self.get_logger().info("Publishing initial pose to AMCL (latched, transient_local)...")
-        self._publish_initial_pose()
+        # 多次 publish (每 0.3s 一次, 共 2 秒) 让 AMCL 至少收到一次, 不论它何时 active.
+        self.get_logger().info("Publishing initial pose to AMCL (BE+volatile, retry 7x)...")
+        import time as _time
+        for _ in range(7):
+            self._publish_initial_pose()
+            rclpy.spin_once(self, timeout_sec=0.0)
+            _time.sleep(0.3)
         self._init_pose_sent = True
 
         # Nav2 ActionServer 预热 (一次性阻塞, 放 init 避免阻塞 timer callback)
