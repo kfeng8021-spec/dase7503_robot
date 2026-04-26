@@ -107,7 +107,7 @@ collision_monitor:
       simulation_time_step: 0.1
       min_points: 6
       visualize: False
-      enabled: True
+      enabled: False    # 禁用 collision_monitor approach action — controller 自己有 inflation_layer 已经够避障
     observation_sources: ["scan"]
     scan:
       type: "scan"
