@@ -12,10 +12,13 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 
 
-# ESP32 motor 死区 (实测) - 调小让车更慢更可控
-LINEAR_DEADBAND = 0.10   # 0.15 太快, 0.10 仍跨死区
-ANGULAR_DEADBAND = 0.3   # 0.5 太快, 0.3 仍跨死区
+# ESP32 motor 死区 (实测) - 最慢档
+LINEAR_DEADBAND = 0.08   # 0.10 还快, 试 0.08
+ANGULAR_DEADBAND = 0.20  # 0.3 还快, 试 0.20
 EPS = 0.01               # 完全 0 不放大 (controller 想停)
+# 加 max 限制: 即使 controller 输出 desired_linear_vel=0.15, 也不超过这值
+MAX_LINEAR = 0.15
+MAX_ANGULAR = 0.5
 
 
 class CmdVelRelay(Node):
@@ -46,6 +49,12 @@ class CmdVelRelay(Node):
         # Boost angular if in deadband
         if EPS < abs(out.angular.z) < ANGULAR_DEADBAND:
             out.angular.z = ANGULAR_DEADBAND if out.angular.z > 0 else -ANGULAR_DEADBAND
+
+        # Cap max (防止 controller 突发大值导致车冲)
+        if abs(out.linear.x) > MAX_LINEAR:
+            out.linear.x = MAX_LINEAR if out.linear.x > 0 else -MAX_LINEAR
+        if abs(out.angular.z) > MAX_ANGULAR:
+            out.angular.z = MAX_ANGULAR if out.angular.z > 0 else -MAX_ANGULAR
 
         self.pub.publish(out)
 
