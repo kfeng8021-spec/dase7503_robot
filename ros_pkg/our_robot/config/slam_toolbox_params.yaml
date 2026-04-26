@@ -32,17 +32,17 @@ slam_toolbox:
     # --- Scan match ---
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.1  # 实车建图: 0.1m 触发 keyframe (太小累积误差, 太大覆盖不密)
-    minimum_travel_heading: 0.15  # 8.6° 触发, 转弯时也补 keyframe
+    minimum_travel_distance: 0.3  # 0.1→0.3 减少抖动 keyframe (Mecanum 打滑 odom 噪声大)
+    minimum_travel_heading: 0.3   # 0.15→0.3 (~17°) 同上
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
 
-    # --- Loop closure ---
+    # --- Loop closure (场地小+特征少, 调激进) ---
     do_loop_closing: true
-    loop_search_maximum_distance: 3.0
-    loop_match_minimum_chain_size: 10
+    loop_search_maximum_distance: 2.0  # 3.0→2.0, 场地 3×2m 范围小
+    loop_match_minimum_chain_size: 6   # 10→6 更激进
     loop_match_maximum_variance_coarse: 3.0
-    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_coarse: 0.3   # 0.35→0.3 容忍特征少环境
     loop_match_minimum_response_fine: 0.45
 
     # --- Correlation ---
