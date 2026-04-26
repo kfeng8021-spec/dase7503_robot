@@ -175,7 +175,7 @@ def generate_launch_description():
         lidar,
         camera,
         qr_scanner,
-        yolo,
+        # yolo,   # 暂禁: Pi5 CPU 跑不动 nav2+camera+yolo 同时跑, controller 频率掉到 7Hz fail
         battery,
         nav2_localization,
         nav2_navigation,
