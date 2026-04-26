@@ -18,10 +18,9 @@ FIELD_HEIGHT = 3.020  # y 方向 (mm: 3020)
 # START zone:        中心 (1.000, 0.295), 800×600 mm, 角点 (0.601, 0)~(1.399, 0.595)
 # DESTINATION zone:  中心 (1.000, 2.626), 1410×800 mm, 角点 (0.294, 2.224)~(1.706, 3.020)
 
-# 起点 (START): 用户指定 "初始 lift 点 = start_zone 右半中心"
-#   start_zone 右半 x ∈ [1.000, 1.399], 中点 x = 1.200, y = 0.295 (zone 中心)
+# 起点 (START): 用户实测 "初始 lift 点 = start_zone 右半中心" = (1200, 298) mm
 # yaw=π/2 朝 +y (朝 destination_zone)
-START_POINT = {"x": 1.200, "y": 0.295, "yaw": 1.5708}
+START_POINT = {"x": 1.200, "y": 0.298, "yaw": 1.5708}
 
 # 目的区 (DESTINATION): destination_zone 中心
 DESTINATION = {"x": 1.000, "y": 2.626, "yaw": 1.5708}
