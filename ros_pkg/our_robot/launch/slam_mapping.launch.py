@@ -66,14 +66,13 @@ def generate_launch_description():
         output="log",
     )
 
-    # 3b. EKF 融合 wheel odom + IMU → 发 odom→base_footprint TF
-    # (取代 odom_tf_broadcaster, 修 Mecanum 打滑 yaw drift)
-    ekf = Node(
-        package="robot_localization",
-        executable="ekf_node",
-        name="ekf_filter_node",
-        parameters=[ekf_params],
-        output="screen",
+    # 3b. odom -> base_footprint TF (BE 订阅, 实测 work)
+    # EKF 改造没解决 queue full 反加 bias 问题, 撤回
+    odom_tf = Node(
+        package="our_robot",
+        executable="odom_tf_broadcaster",
+        name="odom_tf_broadcaster",
+        output="log",
     )
 
     # 4. SLAM Toolbox (online async 模式, 边走边建).
@@ -96,17 +95,9 @@ def generate_launch_description():
     # 5. Teleop 提示: 单独终端跑 ros2 run teleop_twist_keyboard teleop_twist_keyboard
     # 这里不拉起 (终端抢焦点)
 
-    qos_bridge = Node(
-        package="our_robot",
-        executable="qos_bridge_node",
-        name="qos_bridge",
-        output="log",
-    )
-
     return LaunchDescription([
         robot_state,
-        qos_bridge,
-        ekf,
+        odom_tf,
         lidar,
         slam,
     ])
