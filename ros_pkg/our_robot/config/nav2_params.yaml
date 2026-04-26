@@ -48,6 +48,10 @@ controller_server:
       rotate_to_heading_min_angle: 0.30
       rotate_to_heading_angular_vel: 1.5   # 激进档, 实测 0.8 不够车不动
       min_approach_linear_velocity: 0.20   # 接近时最小线速度
+      # 禁 regulated scaling: rack inflation 让 cost 高 → linear 被砍 0 → 车不动.
+      # 我们要直接走出 desired_linear_vel.
+      use_regulated_linear_velocity_scaling: false
+      use_cost_regulated_linear_velocity_scaling: false
 
 local_costmap:
   local_costmap:
