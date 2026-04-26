@@ -75,11 +75,12 @@ def generate_launch_description():
         parameters=[{"width": 640, "height": 480, "frame_rate": 30.0}],
     )
 
-    # 5. QR Scanner
+    # 5. QR Detector (Group10 实测能用版本, 订阅 /camera/image_raw, 5s 去重)
+    # 之前是 qr_scanner_node (订阅 compressed), 改成 qr_detector_node 跟单跑测试一致.
     qr_scanner = Node(
         package="our_robot",
-        executable="qr_scanner_node",
-        name="qr_scanner",
+        executable="qr_detector_node",
+        name="qr_detector",
         output="screen",
     )
 

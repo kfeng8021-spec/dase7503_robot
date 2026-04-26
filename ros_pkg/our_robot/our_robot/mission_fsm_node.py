@@ -21,7 +21,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from nav2_msgs.action import NavigateToPose
 from std_msgs.msg import Int32, String
 
@@ -29,6 +29,7 @@ from our_robot.rack_positions import (
     DELIVERY_ORDER,
     DESTINATION,
     RACK_POSITIONS,
+    START_POINT,
     rack_qr_content,
 )
 
@@ -64,6 +65,10 @@ class MissionFSM(Node):
         self._nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
         self.qr_sub = self.create_subscription(String, "/qr_result", self._qr_cb, 10)
         self.lift_pub = self.create_publisher(Int32, "/servo_s2", 10)
+        # AMCL 初始位姿注入: SCAN_START 扫到 START QR 后 publish 一次, 把车的位置告诉 AMCL.
+        # 不用 latch QoS — AMCL 默认订阅 transient_local, publish 一次即可触发.
+        self.init_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
+        self._init_pose_sent = False
 
         # Nav2 ActionServer 预热 (一次性阻塞, 放 init 避免阻塞 timer callback)
         self.get_logger().info("Waiting for navigate_to_pose action server...")
@@ -154,6 +159,25 @@ class MissionFSM(Node):
         msg.data = int(angle_deg)
         self.lift_pub.publish(msg)
 
+    def _publish_initial_pose(self):
+        """SCAN_START 时 publish 一次 /initialpose 把 START_POINT 注入 AMCL."""
+        msg = PoseWithCovarianceStamped()
+        msg.header.frame_id = "map"
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.pose.position.x = float(START_POINT["x"])
+        msg.pose.pose.position.y = float(START_POINT["y"])
+        yaw = float(START_POINT["yaw"])
+        msg.pose.pose.orientation.z = math.sin(yaw / 2.0)
+        msg.pose.pose.orientation.w = math.cos(yaw / 2.0)
+        # 协方差: 位置 ±5cm 信任, yaw ±5° 信任 (AMCL 期望 6x6 row-major, 下标 [0]=xx, [7]=yy, [35]=yaw)
+        msg.pose.covariance[0] = 0.0025   # x var = (0.05m)^2
+        msg.pose.covariance[7] = 0.0025   # y var
+        msg.pose.covariance[35] = 0.00762  # yaw var = (5°)^2 in rad^2
+        self.init_pose_pub.publish(msg)
+        self.get_logger().info(
+            f"📍 Sent /initialpose to AMCL: ({START_POINT['x']}, {START_POINT['y']}, yaw={yaw:.3f})"
+        )
+
     def _loop(self):
         s = self.state
 
@@ -173,8 +197,12 @@ class MissionFSM(Node):
         elif s is State.SCAN_START:
             if self.qr_recv == "START":
                 self._log_qr("START", "START")
-                self.mission_t0 = time.time()  # 8min 计时开始
-                self.get_logger().info("⏱️ Mission timer started (8 min budget).")
+                self.mission_t0 = time.time()  # 3min 计时开始
+                self.get_logger().info("⏱️ Mission timer started (3 min budget).")
+                # 注入初始位姿到 AMCL — 让 Nav2 知道我在 START_POINT
+                if not self._init_pose_sent:
+                    self._publish_initial_pose()
+                    self._init_pose_sent = True
                 self.qr_recv = None
                 self._enter(State.NAV_TO_RACK)
 
