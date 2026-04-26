@@ -12,9 +12,9 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 
 
-# ESP32 motor 死区 (实测)
-LINEAR_DEADBAND = 0.15   # |vx| < 0.15 motor 不响应
-ANGULAR_DEADBAND = 0.5   # |wz| < 0.5 motor 不响应
+# ESP32 motor 死区 (实测) - 调小让车更慢更可控
+LINEAR_DEADBAND = 0.10   # 0.15 太快, 0.10 仍跨死区
+ANGULAR_DEADBAND = 0.3   # 0.5 太快, 0.3 仍跨死区
 EPS = 0.01               # 完全 0 不放大 (controller 想停)
 
 

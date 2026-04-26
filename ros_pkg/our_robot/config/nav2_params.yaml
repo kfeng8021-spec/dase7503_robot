@@ -36,7 +36,7 @@ controller_server:
     controller_plugins: ["FollowPath"]
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.60  # 激进档, 实测中等不够 (车 1cm/sec)
+      desired_linear_vel: 0.30  # 0.6 实测太快失控, 降到 0.3
       lookahead_dist: 0.4
       min_lookahead_dist: 0.2
       max_lookahead_dist: 0.6
