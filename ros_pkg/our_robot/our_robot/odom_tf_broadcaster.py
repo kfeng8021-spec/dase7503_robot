@@ -14,6 +14,7 @@ TF 树完整链 (运行后):
 """
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped
 from tf2_ros import TransformBroadcaster
@@ -23,10 +24,13 @@ class OdomTFBroadcaster(Node):
     def __init__(self):
         super().__init__("odom_tf_broadcaster")
         self.br = TransformBroadcaster(self)
+        # micro-ros ESP32 factory FW publishes /odom_raw with BEST_EFFORT QoS,
+        # default RELIABLE subscriber 收不到 → 必须 BE.
+        qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=50)
         self.sub = self.create_subscription(
-            Odometry, "/odom_raw", self._cb, 50
+            Odometry, "/odom_raw", self._cb, qos
         )
-        self.get_logger().info("odom -> base_footprint TF broadcaster started (sub /odom_raw).")
+        self.get_logger().info("odom -> base_footprint TF broadcaster started (sub /odom_raw, BE QoS).")
 
     def _cb(self, msg: Odometry):
         t = TransformStamped()
