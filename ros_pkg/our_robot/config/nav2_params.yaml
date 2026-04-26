@@ -115,3 +115,25 @@ collision_monitor:
       min_height: 0.05
       max_height: 0.30
       enabled: True
+
+# 我们没充电桩, 但 nav2_bringup navigation_launch 默认拉起 docking_server. 给最小配置
+# 让它不 SIGABRT (dock_plugins 不能为空, 否则 ParameterUninitializedException).
+docking_server:
+  ros__parameters:
+    controller_frequency: 50.0
+    initial_perception_timeout: 5.0
+    wait_charge_timeout: 5.0
+    dock_approach_timeout: 30.0
+    undock_linear_tolerance: 0.05
+    undock_angular_tolerance: 0.1
+    max_retries: 3
+    base_frame: "base_link"
+    fixed_frame: "odom"
+    dock_backwards: false
+    dock_prestaging_tolerance: 0.5
+    dock_plugins: ['simple_charging_dock']
+    simple_charging_dock:
+      plugin: 'opennav_docking::SimpleChargingDock'
+      docking_threshold: 0.05
+      staging_x_offset: -0.7
+      use_external_detection_pose: true
