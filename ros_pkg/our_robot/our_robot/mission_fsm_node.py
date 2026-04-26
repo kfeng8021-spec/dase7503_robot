@@ -66,10 +66,21 @@ class MissionFSM(Node):
         self._nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
         self.qr_sub = self.create_subscription(String, "/qr_result", self._qr_cb, 10)
         self.lift_pub = self.create_publisher(Int32, "/servo_s2", 10)
-        # AMCL 初始位姿注入: SCAN_START 扫到 START QR 后 publish 一次, 把车的位置告诉 AMCL.
-        # 不用 latch QoS — AMCL 默认订阅 transient_local, publish 一次即可触发.
+        # AMCL 初始位姿注入. 必须在 wait_for_server 之前 publish — 否则:
+        #   controller_server.activate() 等 map frame → map frame 来自 AMCL → AMCL 等 /initialpose
+        #   → mission_fsm wait_for_server (60s) 内 controller_server 超时 abort
+        # 所以 init 一启动就 publish, 不等扫到 START QR.
         self.init_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
         self._init_pose_sent = False
+
+        # spin_once 让 publisher 跟 AMCL discovery 一下, 再 publish (确保不丢)
+        self.get_logger().info("Publishing initial pose to AMCL (pre-Nav2-activate)...")
+        for _ in range(20):
+            rclpy.spin_once(self, timeout_sec=0.1)
+            if self.init_pose_pub.get_subscription_count() > 0:
+                break
+        self._publish_initial_pose()
+        self._init_pose_sent = True
 
         # Nav2 ActionServer 预热 (一次性阻塞, 放 init 避免阻塞 timer callback)
         self.get_logger().info("Waiting for navigate_to_pose action server...")
