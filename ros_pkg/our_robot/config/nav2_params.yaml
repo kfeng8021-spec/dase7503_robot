@@ -36,7 +36,7 @@ controller_server:
     controller_plugins: ["FollowPath"]
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.40  # 中等档, 跨过 ESP32 死区
+      desired_linear_vel: 0.60  # 激进档, 实测中等不够 (车 1cm/sec)
       lookahead_dist: 0.4
       min_lookahead_dist: 0.2
       max_lookahead_dist: 0.6
@@ -46,8 +46,8 @@ controller_server:
       # linear.x < 0.1 m/s 时也大概率不动. 强制最小速度 + rotate_to_heading 参数:
       use_rotate_to_heading: true
       rotate_to_heading_min_angle: 0.30
-      rotate_to_heading_angular_vel: 0.8   # 中等档, 跨过 ESP32 motor 死区
-      min_approach_linear_velocity: 0.15   # 接近时最小线速度
+      rotate_to_heading_angular_vel: 1.5   # 激进档, 实测 0.8 不够车不动
+      min_approach_linear_velocity: 0.20   # 接近时最小线速度
 
 local_costmap:
   local_costmap:
