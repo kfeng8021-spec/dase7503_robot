@@ -33,10 +33,18 @@ except ImportError:
 FIELD_W_MM = 2000                     # 短边 / 沿 +x (图像 width, 水平)
 FIELD_H_MM = 3020                     # 长边 / 沿 +y (图像 height, 垂直)
 
-# Rack 是桥拱形门框 (140mm 开口宽), 机器人 (≤30×30×18cm) 钻到 rack 底下,
-# 叉臂顶起 rack 顶板 → 带着 rack 移动. 因此 rack **不**画为 occupied
-# (画了机器人就到不了 rack 中心). LiDAR 13cm 高度只能看到立柱稀疏反射,
-# 由 local_costmap 实时处理, 不进静态地图.
+# Rack 364×144 mm. LiDAR 13cm 高度看到 4 立柱反射. 必须画进 static map,
+# 否则 AMCL likelihood field 没法 lock — LiDAR 看到 rack 但 map 是 free → 漂.
+# 代价: nav planner 会绕开 rack, mission_fsm APPROACH_RACK 必须用 raw cmd_vel hack
+# 钻进去 (跳过 Nav2 controller).
+RACKS_MM = {
+    "A": (530, 1890),
+    "B": (1389, 1180),
+    "C": (1693, 1688),
+    "D": (378, 1081),
+}
+RACK_SIZE_X_MM = 364
+RACK_SIZE_Y_MM = 144
 
 # destination_zone (1400x800) + start_zone (600x800) 是地面 marked 区域 (绿/蓝垫),
 # 不是物理墙, 机器人可以自由穿越 → 静态地图里不画.
@@ -69,7 +77,19 @@ def generate(resolution_m: float, out_dir: str):
         img_row1 = border_px + mm_to_px(FIELD_H_MM - y0_mm)  # 下边
         return img_row0, img_row1
 
-    # racks 不画 (机器人要开进去抬, 不能当 occupied)
+    # 画 rack (occupied) — AMCL 需要它锁 LiDAR. nav planner 绕开 rack 是预期,
+    # APPROACH_RACK 阶段 mission_fsm 走 raw cmd_vel 跳过 Nav2 钻进去.
+    half_x = mm_to_px(RACK_SIZE_X_MM / 2)
+    half_y = mm_to_px(RACK_SIZE_Y_MM / 2)
+    for rack_id, (cx_mm, cy_mm) in RACKS_MM.items():
+        cx_px = border_px + mm_to_px(cx_mm)
+        # world y 朝上, image row 朝下 → 翻转
+        cy_px_img = border_px + mm_to_px(FIELD_H_MM - cy_mm)
+        r0 = max(0, cy_px_img - half_y)
+        r1 = min(total_h, cy_px_img + half_y)
+        c0 = max(0, cx_px - half_x)
+        c1 = min(total_w, cx_px + half_x)
+        img[r0:r1, c0:c1] = 0  # occupied
 
     os.makedirs(out_dir, exist_ok=True)
     pgm_path = os.path.join(out_dir, "gamefield_map.pgm")
@@ -102,7 +122,7 @@ def generate(resolution_m: float, out_dir: str):
     print(f"  border:  {BORDER_MM} mm = {border_px} px")
     print(f"  origin:  ({origin_x_m}, {origin_y_m}) m = 图像左下角对应的世界坐标")
     print(f"  world:   (0,0) = 场地左下, +x → 短边 {FIELD_W_MM/1000}m (水平), +y → 长边 {FIELD_H_MM/1000}m (垂直)")
-    print(f"  racks:   不画 (机器人要钻到 rack 底下托起, 不是绕行的障碍物)")
+    print(f"  racks:   画 4 个 ({RACK_SIZE_X_MM}x{RACK_SIZE_Y_MM} mm 实心) — AMCL 锁 LiDAR 用; APPROACH_RACK 走 raw cmd_vel 钻")
 
 
 def main():
