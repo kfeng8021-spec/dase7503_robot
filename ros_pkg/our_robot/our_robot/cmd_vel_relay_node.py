@@ -34,6 +34,12 @@ class CmdVelRelay(Node):
         out.linear.y = msg.linear.y
         out.angular.z = msg.angular.z
 
+        # 暴力 hack: controller 总是只发 angular linear=0 让车原地转, Mecanum 打滑骗 odom.
+        # 如果命令 angular 不为 0 但 linear=0, 强制 linear=0.15 (车至少真前进).
+        # 接受: 转弯弧线大 (controller 想原地转得到的实际是大转弯), 但车真动.
+        if abs(out.angular.z) > EPS and abs(out.linear.x) < EPS:
+            out.linear.x = LINEAR_DEADBAND  # 强制前进
+
         # Boost linear if in deadband
         if EPS < abs(out.linear.x) < LINEAR_DEADBAND:
             out.linear.x = LINEAR_DEADBAND if out.linear.x > 0 else -LINEAR_DEADBAND
