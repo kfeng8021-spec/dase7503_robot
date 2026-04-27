@@ -43,7 +43,7 @@ class Group10VisionNode(Node):
             is_valid = False
             if data in ["START", "END"]:
                 is_valid = True
-            elif re.match(r"RACK[A-D]_TM10$", data):  # 只放我们队 TM10, 滤掉别队 (AM9L/IU82/2P6L 等)
+            elif re.match(r"RACK[A-D]_.+", data):  # 老师赛事 QR 格式: RACK[A-D]_<老师分配的随机代码>, 不限定具体代码
                 is_valid = True
 
             if is_valid:
