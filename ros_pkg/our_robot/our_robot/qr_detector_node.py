@@ -6,8 +6,15 @@ from cv_bridge import CvBridge
 import cv2
 from pyzbar import pyzbar
 import datetime
+import os
 import re
 import time
+
+# 启动时一次性检测 GUI 环境: 有 X11 (DISPLAY) 或 Qt offscreen 平台时才跑 cv2.imshow,
+# 否则 SSH 远程启会因 Qt xcb 找不到 display 直接 abort (exit -6)
+_HAS_GUI = bool(os.environ.get('DISPLAY')) or os.environ.get('QT_QPA_PLATFORM') == 'offscreen'
+
+
 class Group10VisionNode(Node):
     def __init__(self):
         super().__init__('group10_vision_node')
@@ -36,7 +43,7 @@ class Group10VisionNode(Node):
             is_valid = False
             if data in ["START", "END"]:
                 is_valid = True
-            elif re.match(r"RACK[A-D]_.+", data):
+            elif re.match(r"RACK[A-D]_TM10$", data):  # 只放我们队 TM10, 滤掉别队 (AM9L/IU82/2P6L 等)
                 is_valid = True
 
             if is_valid:
@@ -64,8 +71,9 @@ class Group10VisionNode(Node):
                     self.get_logger().info(f'Saved Evidence: {filename}')
                     self.captured_list.append(data)
 
-        cv2.imshow("Group 10 Debug", frame)
-        cv2.waitKey(1)
+        if _HAS_GUI:
+            cv2.imshow("Group 10 Debug", frame)
+            cv2.waitKey(1)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -77,7 +85,8 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
-        cv2.destroyAllWindows()
+        if _HAS_GUI:
+            cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     main()

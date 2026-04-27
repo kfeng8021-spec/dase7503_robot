@@ -24,9 +24,9 @@ A4_W_MM, A4_H_MM = 210, 297
 A4_W_PX = int(A4_W_MM / 25.4 * DPI)  # 2480
 A4_H_PX = int(A4_H_MM / 25.4 * DPI)  # 3508
 
-QR_CELL_W_MM = 85     # 每格宽
-QR_CELL_H_MM = 90     # 每格高 (含标签)
-QR_SIZE_MM = 75       # QR 正方形边长
+QR_CELL_W_MM = 65     # 每格宽
+QR_CELL_H_MM = 70     # 每格高 (含标签)
+QR_SIZE_MM = 55       # QR 正方形边长
 LABEL_H_MM = 12       # 标签高度
 
 def mm_to_px(mm):
