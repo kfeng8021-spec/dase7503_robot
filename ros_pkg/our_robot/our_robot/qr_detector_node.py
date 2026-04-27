@@ -39,37 +39,31 @@ class Group10VisionNode(Node):
 
         for barcode in barcodes:
             data = barcode.data.decode("utf-8")
-    
-            is_valid = False
-            if data in ["START", "END"]:
-                is_valid = True
-            elif re.match(r"RACK[A-D]_.+", data):  # 老师赛事 QR 格式: RACK[A-D]_<老师分配的随机代码>, 不限定具体代码
-                is_valid = True
 
-            if is_valid:
-                # 5 秒窗口去重: 同一个 QR 在 5 秒内只 publish 一次, 避免 30 fps 刷屏 mission_fsm
-                key = (data, int(time.time() / 5))
-                if key in self.seen:
-                    continue
-                self.seen.add(key)
+            # 不做内容过滤: pyzbar 解出的任意 QR 都 publish, 避免 regex 跟老师实际 schema 不匹配漏识别
+            # 5 秒窗口去重: 同一个 QR 在 5 秒内只 publish 一次, 避免 30 fps 刷屏 mission_fsm
+            key = (data, int(time.time() / 5))
+            if key in self.seen:
+                continue
+            self.seen.add(key)
 
-                (x, y, w, h) = barcode.rect
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                cv2.putText(frame, data, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            (x, y, w, h) = barcode.rect
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(frame, data, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
+            result_msg = String()
+            result_msg.data = data
+            self.publisher_.publish(result_msg)
+            self.get_logger().info(f'Detected: {data}')
 
-                result_msg = String()
-                result_msg.data = data
-                self.publisher_.publish(result_msg)
-                self.get_logger().info(f'Detected: {data}')
-
-
-                if data not in self.captured_list:
-                    timestamp = datetime.datetime.now().strftime("%H%M%S")
-                    filename = f"G10_Evidence_{data}_{timestamp}.png"
-                    cv2.imwrite(filename, frame)
-                    self.get_logger().info(f'Saved Evidence: {filename}')
-                    self.captured_list.append(data)
+            if data not in self.captured_list:
+                timestamp = datetime.datetime.now().strftime("%H%M%S")
+                # 文件名 sanitize: 老师乱码可能含 / : * 等不能作文件名的字符
+                safe_data = "".join(c if c.isalnum() or c in "-_" else "_" for c in data)[:40]
+                filename = f"G10_Evidence_{safe_data}_{timestamp}.png"
+                cv2.imwrite(filename, frame)
+                self.get_logger().info(f'Saved Evidence: {filename}')
+                self.captured_list.append(data)
 
         if _HAS_GUI:
             cv2.imshow("Group 10 Debug", frame)
