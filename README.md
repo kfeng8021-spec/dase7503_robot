@@ -6,6 +6,8 @@
 
 **Deadline**: 2026-04-27 (Mon) · [Game field spec](docs/game_field.md) · [Wiring](docs/wiring.md) · [PID tuning](docs/pid_tuning.md)
 
+**Demo / Submission Materials**: [Google Drive folder](https://drive.google.com/drive/folders/1jJu_jJcTyburXDEJXnJ0v87mApNDu1qE?usp=sharing) · [Field.mp4](https://drive.google.com/file/d/1Um9JuQaaRrmgw0-fhiDYiSQS8zMbOaa8/view?usp=sharing) · [QRScan&Time.mp4](https://drive.google.com/file/d/18qLlR4JD5wtBqxEszsLlZKlroklsS2be/view?usp=sharing) · [Presentation](https://drive.google.com/file/d/1C4D9pZIuZg_dDBKVw3HzxvJLAhAreFF4/view?usp=sharing) · [CAD archive](https://drive.google.com/file/d/1k36CBbZSns01qzZIZNJbJJtI8B1uHejJ/view?usp=sharing)
+
 ---
 
 ## 快速开始
