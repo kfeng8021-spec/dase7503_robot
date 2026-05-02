@@ -1,4 +1,4 @@
-# DASE7503 Smart Logistics Robot
+# Autonomous Logistics Robot
 
 双板架构物流机器人: **Raspberry Pi 5 (ROS 2 Jazzy) + ESP32-S3 (micro-ROS)** + Mecanum 全向底盘 + 升降机构.
 
@@ -15,8 +15,8 @@
 ### Pi5 上首次部署 (Ubuntu 24.04)
 ```bash
 cd ~
-git clone https://github.com/kfeng8021-spec/dase7503_robot.git
-cd dase7503_robot/rpi5_setup
+git clone https://github.com/kfeng8021-spec/autonomous-logistics-robot.git
+cd autonomous-logistics-robot/rpi5_setup
 sudo bash install.sh
 sudo reboot   # 让 camera overlay 生效
 ```
